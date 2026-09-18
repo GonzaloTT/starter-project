@@ -103,6 +103,22 @@ Validation on 2026-09-17: `npm test` completed with 52/52 passing tests
 (40 Firestore, 12 Storage), using Firebase CLI 15.30.1 and Java 21.
 Both test emulators shut down automatically. `git diff --check` also passed.
 
+## Publication persistence integration tests
+
+Run `npm run test:integration` here for JavaScript SDK service integrations and
+emulator safety checks. No new dependencies are needed. The command starts BOTH
+emulators with `firebase.test.json` and `demo-symmetry-rules`, ignoring the real
+default project in `.firebaserc`. The original `npm test` remains the 52-test
+rules suite. Run these commands sequentially because they share emulator ports.
+
+These are not Flutter end-to-end tests. A negative cross-service test verifies
+that the actual Storage emulator URL is rejected by the existing Firestore HTTPS
+rule. The HTTPS fixture in isolated Firestore tests is never downloaded and does
+not represent an uploaded image.
+
+See [publication persistence validation](docs/PUBLICATION_PERSISTENCE_VALIDATION.md)
+for coverage, safeguards, results and the pending Android/Console checklist.
+
 ## Running the project in a local emulator
 To run the application locally, use the following command:
 

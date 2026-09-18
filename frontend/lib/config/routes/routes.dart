@@ -7,6 +7,7 @@ import '../../features/daily_news/presentation/pages/home/daily_news.dart';
 import '../../features/daily_news/presentation/pages/saved_article/saved_article.dart';
 import '../../features/publish_article/presentation/cubit/publish_article_cubit.dart';
 import '../../features/publish_article/presentation/pages/publish_article_page.dart';
+import '../../features/publish_article/presentation/services/article_image_picker.dart';
 import '../../injection_container.dart';
 
 class AppRoutes {
@@ -29,7 +30,7 @@ class AppRoutes {
         return _materialRoute(
           BlocProvider<PublishArticleCubit>(
             create: (_) => sl<PublishArticleCubit>(),
-            child: const PublishArticlePage(),
+            child: PublishArticlePage(imagePicker: sl<ArticleImagePicker>()),
           ),
         );
 

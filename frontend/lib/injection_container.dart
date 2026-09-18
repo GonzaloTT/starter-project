@@ -12,6 +12,8 @@ import 'features/daily_news/domain/usecases/save_article.dart';
 import 'features/daily_news/presentation/bloc/article/local/local_article_bloc.dart';
 import 'features/publish_article/domain/use_cases/publish_article_use_case.dart';
 import 'features/publish_article/presentation/cubit/publish_article_cubit.dart';
+import 'features/publish_article/presentation/services/article_image_picker.dart';
+import 'features/publish_article/presentation/services/gallery_article_image_picker.dart';
 
 final sl = GetIt.instance;
 
@@ -39,6 +41,10 @@ Future<void> initializeDependencies() async {
 
   sl.registerSingleton<PublishArticleUseCase>(
     PublishArticleUseCase(),
+  );
+
+  sl.registerLazySingleton<ArticleImagePicker>(
+    () => GalleryArticleImagePicker(),
   );
 
   //Blocs

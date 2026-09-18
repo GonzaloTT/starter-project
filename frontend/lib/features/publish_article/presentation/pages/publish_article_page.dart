@@ -1,12 +1,18 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/use_cases/publish_article_result.dart';
 import '../cubit/publish_article_cubit.dart';
 import '../cubit/publish_article_state.dart';
+import '../services/article_image_picker.dart';
 
 class PublishArticlePage extends StatelessWidget {
-  const PublishArticlePage({Key? key}) : super(key: key);
+  final ArticleImagePicker imagePicker;
+
+  const PublishArticlePage({Key? key, required this.imagePicker})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +65,7 @@ class PublishArticlePage extends StatelessWidget {
                       context.read<PublishArticleCubit>().descriptionChanged,
                 ),
                 const SizedBox(height: 24),
-                _ThumbnailSection(state: state),
+                _ThumbnailSection(state: state, imagePicker: imagePicker),
                 const SizedBox(height: 24),
                 _ArticleTextField(
                   fieldKey: const Key('publishArticleContentField'),
@@ -125,24 +131,51 @@ class PublishArticlePage extends StatelessWidget {
   }
 }
 
-class _ThumbnailSection extends StatelessWidget {
+class _ThumbnailSection extends StatefulWidget {
   final PublishArticleState state;
+  final ArticleImagePicker imagePicker;
 
-  const _ThumbnailSection({required this.state});
+  const _ThumbnailSection({required this.state, required this.imagePicker});
+
+  @override
+  State<_ThumbnailSection> createState() => _ThumbnailSectionState();
+}
+
+class _ThumbnailSectionState extends State<_ThumbnailSection> {
+  bool _isPicking = false;
+
+  Future<void> _pickImage() async {
+    final cubit = context.read<PublishArticleCubit>();
+    setState(() => _isPicking = true);
+    try {
+      final thumbnail = await widget.imagePicker.pickImage();
+      if (!mounted || cubit.isClosed || cubit.state.isSubmitting) return;
+      if (thumbnail != null) cubit.thumbnailSelected(thumbnail);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Unable to select an image. Please try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isPicking = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final error = state.thumbnailError;
+    final error = widget.state.thumbnailError;
+    final thumbnail = widget.state.thumbnail;
 
     return Column(
       children: [
         ElevatedButton.icon(
           key: const Key('publishArticleAttachImageButton'),
-          onPressed: null,
+          onPressed:
+              _isPicking || widget.state.isSubmitting ? null : _pickImage,
           style: ElevatedButton.styleFrom(
-            disabledBackgroundColor:
-                Theme.of(context).colorScheme.primaryContainer,
-            disabledForegroundColor: Colors.black87,
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            foregroundColor: Colors.black87,
             elevation: 4,
             padding: const EdgeInsets.symmetric(
               horizontal: 24,
@@ -158,6 +191,34 @@ class _ThumbnailSection extends StatelessWidget {
             style: TextStyle(fontSize: 16),
           ),
         ),
+        if (thumbnail != null) ...[
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.memory(
+              Uint8List.fromList(thumbnail.bytes),
+              key: const Key('publishArticleImagePreview'),
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const SizedBox(
+                height: 180,
+                child:
+                    Center(child: Text('Preview unavailable for this image.')),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(thumbnail.fileName, textAlign: TextAlign.center),
+          TextButton.icon(
+            key: const Key('publishArticleRemoveImageButton'),
+            onPressed: _isPicking || widget.state.isSubmitting
+                ? null
+                : context.read<PublishArticleCubit>().thumbnailRemoved,
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Remove image'),
+          ),
+        ],
         if (error != null) ...[
           const SizedBox(height: 8),
           Text(

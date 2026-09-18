@@ -221,7 +221,7 @@ This completed the manually validated end-to-end flow:
 
 A short end-to-end demonstration of the final application is available here:
 
-**[Watch the final application demo](./report-assets/app-demo.mp4)**
+**[Watch the final application demo](https://drive.google.com/file/d/1Wd2PLke6ofME18RQV-I14w-xH4mtLkm1/view?usp=sharing)**
 
 The demo covers the main user flow from article creation and thumbnail selection through publication, persistence, and retrieval from the Published Articles section.
 

@@ -1,19 +1,14 @@
 import '../../../../core/usecase/usecase.dart';
-import '../entities/publishable_article.dart';
+import '../entities/article_thumbnail.dart';
 import '../params/publish_article_params.dart';
+import '../repository/publish_article_repository.dart';
 import 'publish_article_result.dart';
 
 class PublishArticleUseCase
     implements UseCase<PublishArticleResult, PublishArticleParams> {
-  final DateTime Function() _clock;
-  final String Function() _generateId;
+  final PublishArticleRepository _repository;
 
-  PublishArticleUseCase({
-    DateTime Function()? clock,
-    String Function()? generateId,
-  })  : _clock = clock ?? DateTime.now,
-        _generateId = generateId ??
-            (() => 'mock-${DateTime.now().microsecondsSinceEpoch}');
+  PublishArticleUseCase(this._repository);
 
   @override
   Future<PublishArticleResult> call({PublishArticleParams? params}) async {
@@ -62,21 +57,18 @@ class PublishArticleUseCase
       return PublishArticleResult.validationFailure(errors);
     }
 
-    final id = _generateId();
-    final now = _clock();
-    final objectPath = Uri.encodeComponent('media/articles/$id/$fileName');
-    return PublishArticleResult.success(PublishableArticle(
-      id: id,
+    final article = await _repository.publishArticle(PublishArticleParams(
       author: author,
       title: title,
       description: description,
       content: content,
-      thumbnailUrl: 'https://firebasestorage.googleapis.com/v0/b/'
-          'mock-publish-article.invalid/o/$objectPath?alt=media&token=mock',
-      publishedAt: now,
-      createdAt: now,
-      updatedAt: now,
+      thumbnail: ArticleThumbnail(
+        fileName: fileName,
+        mimeType: params.thumbnail.mimeType,
+        bytes: params.thumbnail.bytes,
+      ),
     ));
+    return PublishArticleResult.success(article);
   }
 
   void _validateText(

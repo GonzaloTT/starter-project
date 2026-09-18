@@ -21,6 +21,8 @@ import 'package:news_app_clean_architecture/features/publish_article/presentatio
 import 'package:news_app_clean_architecture/features/publish_article/presentation/services/article_image_picker.dart';
 import 'package:news_app_clean_architecture/injection_container.dart';
 
+import '../../support/fake_publish_article_repository.dart';
+
 import 'publish_article_page_test.dart'
     show FakeArticleImagePicker, imageThumbnail, configurePhoneSize;
 
@@ -28,7 +30,8 @@ class ControlledPublisher extends PublishArticleUseCase {
   final Future<void> Function(int attempt) beforePublish;
   int calls = 0;
 
-  ControlledPublisher(this.beforePublish);
+  ControlledPublisher(this.beforePublish)
+      : super(FakePublishArticleRepository());
 
   @override
   Future<PublishArticleResult> call({PublishArticleParams? params}) async {
@@ -196,7 +199,10 @@ void main() {
 
   testWidgets('manual back returns no success and Home shows no confirmation',
       (tester) async {
-    await openForm(tester, PublishArticleCubit(PublishArticleUseCase()));
+    await openForm(
+        tester,
+        PublishArticleCubit(
+            PublishArticleUseCase(FakePublishArticleRepository())));
     await tester.tap(find.byKey(const Key('publishArticleBackButton')));
     await pumpTransitions(tester);
     expect(observer.pops, 1);
@@ -208,7 +214,8 @@ void main() {
   testWidgets(
       'validation keeps the route open and scrolls to first visible-order error without SnackBar',
       (tester) async {
-    final cubit = PublishArticleCubit(PublishArticleUseCase());
+    final cubit = PublishArticleCubit(
+        PublishArticleUseCase(FakePublishArticleRepository()));
     await openForm(tester, cubit);
     await tester
         .ensureVisible(find.byKey(const Key('publishArticleContentField')));
@@ -278,7 +285,8 @@ void main() {
   for (final result in <bool?>[true, false, null]) {
     testWidgets('Home confirms only a true route result: $result',
         (tester) async {
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
       addTearDown(cubit.close);
       await openForm(tester, cubit, route: (settings) {
         expect(settings.name, '/PublishArticle');
@@ -318,7 +326,10 @@ void main() {
       (tester) async {
     final showHome = ValueNotifier(true);
     addTearDown(showHome.dispose);
-    await openForm(tester, PublishArticleCubit(PublishArticleUseCase()),
+    await openForm(
+        tester,
+        PublishArticleCubit(
+            PublishArticleUseCase(FakePublishArticleRepository())),
         home: ValueListenableBuilder<bool>(
           valueListenable: showHome,
           builder: (_, visible, __) => visible

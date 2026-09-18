@@ -9,11 +9,14 @@ import 'package:news_app_clean_architecture/features/publish_article/domain/use_
 import 'package:news_app_clean_architecture/features/publish_article/presentation/cubit/publish_article_cubit.dart';
 import 'package:news_app_clean_architecture/features/publish_article/presentation/cubit/publish_article_state.dart';
 
+import '../../support/fake_publish_article_repository.dart';
+
 class ControlledPublishArticleUseCase extends PublishArticleUseCase {
   final Future<PublishArticleResult> Function(PublishArticleParams params)
       handler;
 
-  ControlledPublishArticleUseCase(this.handler);
+  ControlledPublishArticleUseCase(this.handler)
+      : super(FakePublishArticleRepository());
 
   @override
   Future<PublishArticleResult> call({PublishArticleParams? params}) {
@@ -60,7 +63,8 @@ void completeValidForm(PublishArticleCubit cubit) {
 void main() {
   group('PublishArticleCubit', () {
     test('starts with an empty initial state', () async {
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
 
       expect(cubit.state, PublishArticleState());
 
@@ -68,7 +72,8 @@ void main() {
     });
 
     test('updates each text field independently', () async {
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
 
       cubit.authorChanged('Jane Doe');
       expect(cubit.state.author, 'Jane Doe');
@@ -87,7 +92,8 @@ void main() {
     });
 
     test('selects and removes a thumbnail', () async {
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
       final thumbnail = validThumbnail();
 
       cubit.thumbnailSelected(thumbnail);
@@ -135,7 +141,8 @@ void main() {
     });
 
     test('exposes every domain validation error for empty input', () async {
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
 
       final expectation = expectLater(
         cubit.stream.map((state) => state.status),
@@ -159,7 +166,8 @@ void main() {
     });
 
     test('editing a field clears only its validation error', () async {
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
 
       await cubit.publish();
       expect(cubit.state.validationErrors, hasLength(7));
@@ -182,7 +190,8 @@ void main() {
 
     test('selecting a thumbnail clears all thumbnail validation errors',
         () async {
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
 
       await cubit.publish();
       cubit.thumbnailSelected(validThumbnail());

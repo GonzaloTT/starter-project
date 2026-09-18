@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/entities/article_thumbnail.dart';
+import 'package:news_app_clean_architecture/features/publish_article/domain/entities/publishable_article.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/params/publish_article_params.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/use_cases/publish_article_result.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/use_cases/publish_article_use_case.dart';
+
+import '../../support/fake_publish_article_repository.dart';
 
 PublishArticleParams input({
   Map<PublishArticleField, String> text = const {},
@@ -36,31 +41,16 @@ void expectFailure(
 
 void main() {
   late PublishArticleUseCase useCase;
-  final instant = DateTime.utc(2026, 9, 17, 12);
+  late FakePublishArticleRepository repository;
 
   setUp(() {
-    useCase = PublishArticleUseCase(
-      clock: () => instant,
-      generateId: () => 'article-123',
-    );
+    repository = FakePublishArticleRepository();
+    useCase = PublishArticleUseCase(repository);
   });
 
-  test('valid input succeeds with normalized user data and injected values',
+  test('calls repository once with normalized data without changing input',
       () async {
-    var clockCalls = 0;
-    var idCalls = 0;
-    final controlled = PublishArticleUseCase(
-      clock: () {
-        clockCalls++;
-        return instant;
-      },
-      generateId: () {
-        idCalls++;
-        return 'article-123';
-      },
-    );
-    final result = await controlled(
-        params: input(
+    final original = input(
       text: {
         PublishArticleField.author: '  Jane Doe  ',
         PublishArticleField.title: '\tArticle title\n',
@@ -68,30 +58,23 @@ void main() {
         PublishArticleField.content: '\nArticle content\n',
       },
       fileName: ' thumbnail image.jpg ',
-    ));
+    );
+    final result = await useCase(params: original);
     expect(result.errors, isEmpty);
-    final article = result.article!;
-    expect(article.author, 'Jane Doe');
-    expect(article.title, 'Article title');
-    expect(article.description, 'Article summary');
-    expect(article.content, 'Article content');
-    expect(article.id, 'article-123');
-    expect(article.publishedAt, instant);
-    expect(article.createdAt, instant);
-    expect(article.updatedAt, instant);
-    expect(clockCalls, 1);
-    expect(idCalls, 1);
-    final url = Uri.parse(article.thumbnailUrl);
-    expect(url.scheme, 'https');
-    expect(url.host, 'firebasestorage.googleapis.com');
-    expect(url.pathSegments, [
-      'v0',
-      'b',
-      'mock-publish-article.invalid',
-      'o',
-      'media/articles/article-123/thumbnail image.jpg',
-    ]);
-    expect(url.queryParameters, {'alt': 'media', 'token': 'mock'});
+    expect(repository.calls, hasLength(1));
+    final received = repository.calls.single;
+    expect(received.author, 'Jane Doe');
+    expect(received.title, 'Article title');
+    expect(received.description, 'Article summary');
+    expect(received.content, 'Article content');
+    expect(received.thumbnail.fileName, 'thumbnail image.jpg');
+    expect(received.thumbnail.mimeType, original.thumbnail.mimeType);
+    expect(received.thumbnail.bytes, original.thumbnail.bytes);
+    expect(original.author, '  Jane Doe  ');
+    expect(original.title, '\tArticle title\n');
+    expect(original.description, ' Article summary ');
+    expect(original.content, '\nArticle content\n');
+    expect(original.thumbnail.fileName, ' thumbnail image.jpg ');
   });
 
   const limits = {
@@ -106,6 +89,7 @@ void main() {
           () async {
         final result = await useCase(params: input(text: {entry.key: value}));
         expectFailure(result, entry.key, 'Required.');
+        expect(repository.calls, isEmpty);
       });
     }
     test('${entry.key} accepts exactly its maximum after trim', () async {
@@ -120,6 +104,7 @@ void main() {
       final result = await useCase(params: input(text: {entry.key: value}));
       expectFailure(
           result, entry.key, 'Must not exceed ${entry.value} characters.');
+      expect(repository.calls, isEmpty);
     });
   }
 
@@ -135,6 +120,7 @@ void main() {
       final result = await useCase(params: input(mimeType: mime));
       expectFailure(result, PublishArticleField.thumbnailMimeType,
           'Use JPEG, PNG or WebP.');
+      expect(repository.calls, isEmpty);
     });
   }
   for (final name in ['', '   ']) {
@@ -142,12 +128,14 @@ void main() {
       final result = await useCase(params: input(fileName: name));
       expectFailure(result, PublishArticleField.thumbnailFileName,
           'File name is required.');
+      expect(repository.calls, isEmpty);
     });
   }
   test('rejects empty bytes', () async {
     final result = await useCase(params: input(bytes: []));
     expectFailure(result, PublishArticleField.thumbnailBytes,
         'Image bytes are required.');
+    expect(repository.calls, isEmpty);
   });
   test('accepts exactly 5 MiB', () async {
     final result =
@@ -160,14 +148,11 @@ void main() {
         params: input(bytes: List.filled(5 * 1024 * 1024 + 1, 0)));
     expectFailure(result, PublishArticleField.thumbnailBytes,
         'Image must not exceed 5 MiB.');
+    expect(repository.calls, isEmpty);
   });
   test('accumulates all invalid fields without generating an article',
       () async {
-    final validating = PublishArticleUseCase(
-      clock: () => throw StateError('Clock must not be called.'),
-      generateId: () => throw StateError('ID must not be generated.'),
-    );
-    final result = await validating(
+    final result = await useCase(
         params: input(
       text: {for (final field in limits.keys) field: ' '},
       fileName: ' ',
@@ -177,17 +162,51 @@ void main() {
     expect(result.article, isNull);
     expect(
         result.errors.map((error) => error.field), PublishArticleField.values);
+    expect(repository.calls, isEmpty);
   });
   test('missing params produces ArgumentError', () async {
     await expectLater(useCase(), throwsArgumentError);
+    expect(repository.calls, isEmpty);
   });
   test('explicit null params produces ArgumentError', () async {
     await expectLater(useCase(params: null), throwsArgumentError);
+    expect(repository.calls, isEmpty);
   });
-  test('defaults work without Firebase or global DI', () async {
-    final result = await PublishArticleUseCase()(params: input());
-    expect(result.article, isNotNull);
-    expect(result.article!.id, startsWith('mock-'));
+  test('waits for and returns the exact repository entity', () async {
+    final pending = Completer<PublishableArticle>();
+    repository = FakePublishArticleRepository(handler: (_) => pending.future);
+    useCase = PublishArticleUseCase(repository);
+    var completed = false;
+    final operation = useCase(params: input()).then((result) {
+      completed = true;
+      return result;
+    });
+    await Future<void>.delayed(Duration.zero);
+    expect(completed, isFalse);
+    expect(repository.calls, hasLength(1));
+    final article = PublishableArticle(
+      id: 'repository-id',
+      author: 'Repository author',
+      title: 'Repository title',
+      description: 'Repository description',
+      content: 'Repository content',
+      thumbnailUrl: 'https://example.com/repository-image.png',
+      publishedAt: DateTime.utc(2020),
+      createdAt: DateTime.utc(2021),
+      updatedAt: DateTime.utc(2022),
+    );
+    pending.complete(article);
+    final result = await operation;
+    expect(result.article, same(article));
     expect(result.errors, isEmpty);
+    expect(repository.calls, hasLength(1));
+  });
+  test('propagates repository errors without retrying', () async {
+    final error = StateError('Repository unavailable');
+    repository =
+        FakePublishArticleRepository(handler: (_) async => throw error);
+    useCase = PublishArticleUseCase(repository);
+    await expectLater(useCase(params: input()), throwsA(same(error)));
+    expect(repository.calls, hasLength(1));
   });
 }

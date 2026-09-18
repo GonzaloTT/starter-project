@@ -11,6 +11,8 @@ import 'features/daily_news/domain/usecases/remove_article.dart';
 import 'features/daily_news/domain/usecases/save_article.dart';
 import 'features/daily_news/presentation/bloc/article/local/local_article_bloc.dart';
 import 'features/publish_article/domain/use_cases/publish_article_use_case.dart';
+import 'features/publish_article/domain/repository/publish_article_repository.dart';
+import 'features/publish_article/data/repository/mock_publish_article_repository.dart';
 import 'features/publish_article/presentation/cubit/publish_article_cubit.dart';
 import 'features/publish_article/presentation/services/article_image_picker.dart';
 import 'features/publish_article/presentation/services/gallery_article_image_picker.dart';
@@ -39,9 +41,8 @@ Future<void> initializeDependencies() async {
 
   sl.registerSingleton<RemoveArticleUseCase>(RemoveArticleUseCase(sl()));
 
-  sl.registerSingleton<PublishArticleUseCase>(
-    PublishArticleUseCase(),
-  );
+  sl.registerSingleton<PublishArticleRepository>(MockPublishArticleRepository());
+  sl.registerSingleton<PublishArticleUseCase>(PublishArticleUseCase(sl()));
 
   sl.registerLazySingleton<ArticleImagePicker>(
     () => GalleryArticleImagePicker(),

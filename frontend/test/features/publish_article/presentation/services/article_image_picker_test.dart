@@ -7,6 +7,8 @@ import 'package:news_app_clean_architecture/features/publish_article/domain/use_
 import 'package:news_app_clean_architecture/features/publish_article/domain/use_cases/publish_article_use_case.dart';
 import 'package:news_app_clean_architecture/features/publish_article/presentation/services/gallery_article_image_picker.dart';
 
+import '../../support/fake_publish_article_repository.dart';
+
 GalleryArticleImagePicker pickerFor(XFile? file) => GalleryArticleImagePicker(
       pickImage: ({required source, required requestFullMetadata}) async {
         expect(source, ImageSource.gallery);
@@ -59,8 +61,9 @@ void main() {
               file(mime == null ? 'photo.unknown' : 'photo.jpg', mime: mime))
           .pickImage();
       expect(thumbnail!.mimeType, mime ?? '');
-      final result = await PublishArticleUseCase()(
-          params: PublishArticleParams(
+      final result =
+          await PublishArticleUseCase(FakePublishArticleRepository())(
+              params: PublishArticleParams(
         author: 'Author',
         title: 'Title',
         description: 'Description',

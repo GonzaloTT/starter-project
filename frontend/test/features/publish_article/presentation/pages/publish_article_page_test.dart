@@ -12,6 +12,8 @@ import 'package:news_app_clean_architecture/injection_container.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/entities/article_thumbnail.dart';
 import 'package:news_app_clean_architecture/features/publish_article/presentation/services/article_image_picker.dart';
 
+import '../../support/fake_publish_article_repository.dart';
+
 class FakeArticleImagePicker implements ArticleImagePicker {
   ArticleThumbnail? result;
   bool throwsError = false;
@@ -59,7 +61,8 @@ void main() {
     testWidgets('selects, previews, replaces and removes an image',
         (tester) async {
       configurePhoneSize(tester);
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
       addTearDown(cubit.close);
       final picker = FakeArticleImagePicker()
         ..result = imageThumbnail('first.png');
@@ -97,7 +100,8 @@ void main() {
     testWidgets('cancellation preserves the existing selection and state',
         (tester) async {
       configurePhoneSize(tester);
-      final cubit = PublishArticleCubit(PublishArticleUseCase())
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()))
         ..thumbnailSelected(imageThumbnail('existing.png'));
       addTearDown(cubit.close);
       final initial = cubit.state;
@@ -113,7 +117,8 @@ void main() {
         'picker failure shows feedback without changing publication state',
         (tester) async {
       configurePhoneSize(tester);
-      final cubit = PublishArticleCubit(PublishArticleUseCase())
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()))
         ..thumbnailSelected(imageThumbnail('existing.png'));
       addTearDown(cubit.close);
       final initial = cubit.state;
@@ -133,7 +138,8 @@ void main() {
         'unsupported image remains selected and domain error appears below preview',
         (tester) async {
       configurePhoneSize(tester);
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
       addTearDown(cubit.close);
       final picker = FakeArticleImagePicker()
         ..result = ArticleThumbnail(
@@ -162,7 +168,8 @@ void main() {
         'prevents repeated picker requests and ignores completion after disposal',
         (tester) async {
       configurePhoneSize(tester);
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
       addTearDown(cubit.close);
       final picker = FakeArticleImagePicker()
         ..pending = Completer<ArticleThumbnail?>();
@@ -181,7 +188,8 @@ void main() {
 
     testWidgets('renders the publication form', (tester) async {
       configurePhoneSize(tester);
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
 
       await tester.pumpWidget(buildPage(cubit));
 
@@ -221,7 +229,8 @@ void main() {
 
     testWidgets('sends text field changes to the cubit', (tester) async {
       configurePhoneSize(tester);
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
 
       await tester.pumpWidget(buildPage(cubit));
 
@@ -253,7 +262,8 @@ void main() {
     testWidgets('shows domain validation errors after an empty submission',
         (tester) async {
       configurePhoneSize(tester);
-      final cubit = PublishArticleCubit(PublishArticleUseCase());
+      final cubit = PublishArticleCubit(
+          PublishArticleUseCase(FakePublishArticleRepository()));
 
       await tester.pumpWidget(buildPage(cubit));
 
@@ -275,7 +285,8 @@ void main() {
       await sl.reset();
       sl.registerSingleton<ArticleImagePicker>(FakeArticleImagePicker());
       sl.registerFactory<PublishArticleCubit>(
-        () => PublishArticleCubit(PublishArticleUseCase()),
+        () => PublishArticleCubit(
+            PublishArticleUseCase(FakePublishArticleRepository())),
       );
     });
 

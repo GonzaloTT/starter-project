@@ -6,7 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/use_cases/publish_article_result.dart';
 import '../cubit/publish_article_cubit.dart';
 import '../cubit/publish_article_state.dart';
-import '../services/article_image_picker.dart';
+import '../../domain/repository/article_image_picker.dart';
 
 class PublishArticlePage extends StatefulWidget {
   final ArticleImagePicker imagePicker;

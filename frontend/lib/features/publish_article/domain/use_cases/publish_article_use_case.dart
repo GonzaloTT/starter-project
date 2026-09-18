@@ -2,7 +2,7 @@ import '../../../../core/usecase/usecase.dart';
 import '../entities/article_thumbnail.dart';
 import '../params/publish_article_params.dart';
 import '../repository/publish_article_repository.dart';
-import '../repository/publication_confirmation_pending.dart';
+import '../entities/publication_confirmation_pending.dart';
 import 'publish_article_result.dart';
 
 class PublishArticleUseCase

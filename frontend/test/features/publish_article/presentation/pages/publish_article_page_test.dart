@@ -10,7 +10,7 @@ import 'package:news_app_clean_architecture/features/publish_article/presentatio
 import 'package:news_app_clean_architecture/features/publish_article/presentation/pages/publish_article_page.dart';
 import 'package:news_app_clean_architecture/injection_container.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/entities/article_thumbnail.dart';
-import 'package:news_app_clean_architecture/features/publish_article/presentation/services/article_image_picker.dart';
+import 'package:news_app_clean_architecture/features/publish_article/domain/repository/article_image_picker.dart';
 
 import '../../support/fake_publish_article_repository.dart';
 

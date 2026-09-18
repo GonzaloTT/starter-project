@@ -1,7 +1,7 @@
 import '../../domain/entities/publishable_article.dart';
 import '../../domain/params/publish_article_params.dart';
 import '../../domain/repository/publish_article_repository.dart';
-import '../../domain/repository/publication_confirmation_pending.dart';
+import '../../domain/entities/publication_confirmation_pending.dart';
 import '../data_sources/article_firestore_data_source.dart';
 import '../data_sources/article_storage_data_source.dart';
 import '../data_sources/publication_data_source_exception.dart';

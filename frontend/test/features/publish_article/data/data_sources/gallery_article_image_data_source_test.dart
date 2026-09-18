@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/params/publish_article_params.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/use_cases/publish_article_result.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/use_cases/publish_article_use_case.dart';
-import 'package:news_app_clean_architecture/features/publish_article/presentation/services/gallery_article_image_picker.dart';
+import 'package:news_app_clean_architecture/features/publish_article/data/data_sources/gallery_article_image_data_source.dart';
 
 import '../../support/fake_publish_article_repository.dart';
 

@@ -18,7 +18,7 @@ import 'package:news_app_clean_architecture/features/publish_article/domain/use_
 import 'package:news_app_clean_architecture/features/publish_article/presentation/cubit/publish_article_cubit.dart';
 import 'package:news_app_clean_architecture/features/publish_article/presentation/cubit/publish_article_state.dart';
 import 'package:news_app_clean_architecture/features/publish_article/presentation/pages/publish_article_page.dart';
-import 'package:news_app_clean_architecture/features/publish_article/presentation/services/article_image_picker.dart';
+import 'package:news_app_clean_architecture/features/publish_article/domain/repository/article_image_picker.dart';
 import 'package:news_app_clean_architecture/injection_container.dart';
 
 import '../../support/fake_publish_article_repository.dart';

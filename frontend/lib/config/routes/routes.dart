@@ -11,7 +11,7 @@ import '../../features/publish_article/presentation/cubit/published_articles_cub
 import '../../features/publish_article/presentation/pages/publish_article_page.dart';
 import '../../features/publish_article/presentation/pages/published_article_detail_page.dart';
 import '../../features/publish_article/presentation/pages/published_articles_page.dart';
-import '../../features/publish_article/presentation/services/article_image_picker.dart';
+import '../../features/publish_article/domain/repository/article_image_picker.dart';
 import '../../injection_container.dart';
 
 class AppRoutes {

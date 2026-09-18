@@ -26,8 +26,8 @@ import 'features/publish_article/domain/repository/read_published_articles_repos
 import 'features/publish_article/domain/use_cases/get_published_articles_use_case.dart';
 import 'features/publish_article/presentation/cubit/publish_article_cubit.dart';
 import 'features/publish_article/presentation/cubit/published_articles_cubit.dart';
-import 'features/publish_article/presentation/services/article_image_picker.dart';
-import 'features/publish_article/presentation/services/gallery_article_image_picker.dart';
+import 'features/publish_article/domain/repository/article_image_picker.dart';
+import 'features/publish_article/data/data_sources/gallery_article_image_data_source.dart';
 
 final sl = GetIt.instance;
 

@@ -1,7 +1,7 @@
 import 'package:image_picker/image_picker.dart';
 
 import '../../domain/entities/article_thumbnail.dart';
-import 'article_image_picker.dart';
+import '../../domain/repository/article_image_picker.dart';
 
 typedef PickGalleryImage = Future<XFile?> Function({
   required ImageSource source,

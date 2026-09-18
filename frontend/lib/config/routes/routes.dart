@@ -6,7 +6,11 @@ import '../../features/daily_news/presentation/pages/article_detail/article_deta
 import '../../features/daily_news/presentation/pages/home/daily_news.dart';
 import '../../features/daily_news/presentation/pages/saved_article/saved_article.dart';
 import '../../features/publish_article/presentation/cubit/publish_article_cubit.dart';
+import '../../features/publish_article/domain/entities/publishable_article.dart';
+import '../../features/publish_article/presentation/cubit/published_articles_cubit.dart';
 import '../../features/publish_article/presentation/pages/publish_article_page.dart';
+import '../../features/publish_article/presentation/pages/published_article_detail_page.dart';
+import '../../features/publish_article/presentation/pages/published_articles_page.dart';
 import '../../features/publish_article/presentation/services/article_image_picker.dart';
 import '../../injection_container.dart';
 
@@ -31,6 +35,21 @@ class AppRoutes {
           BlocProvider<PublishArticleCubit>(
             create: (_) => sl<PublishArticleCubit>(),
             child: PublishArticlePage(imagePicker: sl<ArticleImagePicker>()),
+          ),
+        );
+
+      case '/PublishedArticles':
+        return _materialRoute(
+          BlocProvider<PublishedArticlesCubit>(
+            create: (_) => sl<PublishedArticlesCubit>()..load(),
+            child: const PublishedArticlesPage(),
+          ),
+        );
+
+      case '/PublishedArticleDetails':
+        return _materialRoute(
+          PublishedArticleDetailPage(
+            article: settings.arguments as PublishableArticle,
           ),
         );
 

@@ -23,6 +23,11 @@ class DailyNews extends StatelessWidget {
         style: TextStyle(color: Colors.black),
       ),
       actions: [
+        IconButton(
+          tooltip: 'Published Articles',
+          onPressed: () => _onShowPublishedArticlesViewTapped(context),
+          icon: const Icon(Icons.article_outlined, color: Colors.black),
+        ),
         GestureDetector(
           onTap: () => _onShowSavedArticlesViewTapped(context),
           child: const Padding(
@@ -86,6 +91,10 @@ class DailyNews extends StatelessWidget {
 
   void _onShowSavedArticlesViewTapped(BuildContext context) {
     Navigator.pushNamed(context, '/SavedArticles');
+  }
+
+  void _onShowPublishedArticlesViewTapped(BuildContext context) {
+    Navigator.pushNamed(context, '/PublishedArticles');
   }
 
   Future<void> _onPublishArticleViewTapped(BuildContext context) async {

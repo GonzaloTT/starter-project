@@ -17,11 +17,15 @@ import 'package:news_app_clean_architecture/features/daily_news/presentation/wid
 import 'package:news_app_clean_architecture/features/publish_article/domain/entities/article_thumbnail.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/use_cases/publish_article_use_case.dart';
 import 'package:news_app_clean_architecture/features/publish_article/presentation/cubit/publish_article_cubit.dart';
+import 'package:news_app_clean_architecture/features/publish_article/domain/use_cases/get_published_articles_use_case.dart';
+import 'package:news_app_clean_architecture/features/publish_article/presentation/cubit/published_articles_cubit.dart';
 import 'package:news_app_clean_architecture/features/publish_article/presentation/pages/publish_article_page.dart';
+import 'package:news_app_clean_architecture/features/publish_article/presentation/pages/published_articles_page.dart';
 import 'package:news_app_clean_architecture/features/publish_article/presentation/services/article_image_picker.dart';
 import 'package:news_app_clean_architecture/injection_container.dart';
 
 import '../../../../publish_article/support/fake_publish_article_repository.dart';
+import '../../../../publish_article/support/fake_read_published_articles_repository.dart';
 
 class ControlledNews implements GetArticleUseCase {
   final requests = <Completer<DataState<List<ArticleEntity>>>>[];
@@ -49,6 +53,9 @@ void main() {
     sl.registerFactory<PublishArticleCubit>(() => PublishArticleCubit(
         PublishArticleUseCase(FakePublishArticleRepository())));
     sl.registerSingleton<ArticleImagePicker>(UnusedPicker());
+    sl.registerFactory<PublishedArticlesCubit>(() => PublishedArticlesCubit(
+          GetPublishedArticlesUseCase(FakeReadPublishedArticlesRepository()),
+        ));
   });
   tearDown(() async {
     for (final request in news.requests) {
@@ -147,5 +154,16 @@ void main() {
     await tester.pump();
     expect(bloc.state, isA<RemoteArticlesDone>());
     expect(find.text('No news available.'), findsOneWidget);
+  });
+
+  testWidgets('Home opens the independent Published Articles section',
+      (tester) async {
+    await openHome(tester);
+
+    await tester.tap(find.byTooltip('Published Articles'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PublishedArticlesPage), findsOneWidget);
+    expect(find.text('No published articles yet.'), findsOneWidget);
   });
 }

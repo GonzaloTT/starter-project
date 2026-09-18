@@ -6,6 +6,7 @@ enum PublicationDataSource {
 enum PublicationDataSourceOperation {
   createArticle,
   getArticle,
+  listArticles,
   uploadThumbnail,
   getThumbnailDownloadUrl,
 }

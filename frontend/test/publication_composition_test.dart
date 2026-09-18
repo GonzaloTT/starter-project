@@ -8,9 +8,14 @@ import 'package:news_app_clean_architecture/features/publish_article/data/data_s
 import 'package:news_app_clean_architecture/features/publish_article/data/data_sources/article_storage_data_source.dart';
 import 'package:news_app_clean_architecture/features/publish_article/data/data_sources/firebase_article_firestore_data_source.dart';
 import 'package:news_app_clean_architecture/features/publish_article/data/data_sources/firebase_article_storage_data_source.dart';
+import 'package:news_app_clean_architecture/features/publish_article/data/data_sources/firebase_published_articles_firestore_data_source.dart';
+import 'package:news_app_clean_architecture/features/publish_article/data/data_sources/published_articles_firestore_data_source.dart';
 import 'package:news_app_clean_architecture/features/publish_article/data/data_sources/publication_data_source_exception.dart';
 import 'package:news_app_clean_architecture/features/publish_article/data/repository/publish_article_repository_impl.dart';
+import 'package:news_app_clean_architecture/features/publish_article/data/repository/read_published_articles_repository_impl.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/repository/publish_article_repository.dart';
+import 'package:news_app_clean_architecture/features/publish_article/domain/repository/read_published_articles_repository.dart';
+import 'package:news_app_clean_architecture/features/publish_article/domain/use_cases/get_published_articles_use_case.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/use_cases/publish_article_use_case.dart';
 import 'package:news_app_clean_architecture/injection_container.dart';
 
@@ -42,12 +47,18 @@ void main() {
         isA<FirebaseArticleFirestoreDataSource>());
     expect(container<ArticleStorageDataSource>(),
         isA<FirebaseArticleStorageDataSource>());
+    expect(container<PublishedArticlesFirestoreDataSource>(),
+        isA<FirebasePublishedArticlesFirestoreDataSource>());
     expect(container<PublishArticleRepository>(),
         isA<PublishArticleRepositoryImpl>());
     expect(container<PublishArticleRepository>(),
         same(container<PublishArticleRepository>()));
     expect(container<PublishArticleUseCase>(),
         same(container<PublishArticleUseCase>()));
+    expect(container<ReadPublishedArticlesRepository>(),
+        isA<ReadPublishedArticlesRepositoryImpl>());
+    expect(container<GetPublishedArticlesUseCase>(),
+        same(container<GetPublishedArticlesUseCase>()));
   });
 
   test('use case and real repository compose with fake I/O and retain retries',

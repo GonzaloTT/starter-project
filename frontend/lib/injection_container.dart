@@ -19,7 +19,13 @@ import 'features/publish_article/data/data_sources/article_firestore_data_source
 import 'features/publish_article/data/data_sources/article_storage_data_source.dart';
 import 'features/publish_article/data/data_sources/firebase_article_firestore_data_source.dart';
 import 'features/publish_article/data/data_sources/firebase_article_storage_data_source.dart';
+import 'features/publish_article/data/data_sources/firebase_published_articles_firestore_data_source.dart';
+import 'features/publish_article/data/data_sources/published_articles_firestore_data_source.dart';
+import 'features/publish_article/data/repository/read_published_articles_repository_impl.dart';
+import 'features/publish_article/domain/repository/read_published_articles_repository.dart';
+import 'features/publish_article/domain/use_cases/get_published_articles_use_case.dart';
 import 'features/publish_article/presentation/cubit/publish_article_cubit.dart';
+import 'features/publish_article/presentation/cubit/published_articles_cubit.dart';
 import 'features/publish_article/presentation/services/article_image_picker.dart';
 import 'features/publish_article/presentation/services/gallery_article_image_picker.dart';
 
@@ -62,6 +68,10 @@ Future<void> initializeDependencies() async {
   sl.registerFactory<PublishArticleCubit>(
     () => PublishArticleCubit(sl()),
   );
+
+  sl.registerFactory<PublishedArticlesCubit>(
+    () => PublishedArticlesCubit(sl()),
+  );
 }
 
 /// Separate composition entry point so publication can be tested without Floor.
@@ -82,5 +92,16 @@ void registerPublicationDependencies(GetIt container) {
   );
   container.registerLazySingleton<PublishArticleUseCase>(
     () => PublishArticleUseCase(container()),
+  );
+  container.registerLazySingleton<PublishedArticlesFirestoreDataSource>(
+    () => FirebasePublishedArticlesFirestoreDataSource(
+      container<FirebaseFirestore>(),
+    ),
+  );
+  container.registerLazySingleton<ReadPublishedArticlesRepository>(
+    () => ReadPublishedArticlesRepositoryImpl(container()),
+  );
+  container.registerLazySingleton<GetPublishedArticlesUseCase>(
+    () => GetPublishedArticlesUseCase(container()),
   );
 }

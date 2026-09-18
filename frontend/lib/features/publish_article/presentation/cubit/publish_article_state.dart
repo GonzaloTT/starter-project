@@ -7,6 +7,7 @@ import '../../domain/use_cases/publish_article_result.dart';
 enum PublishArticleStatus {
   initial,
   submitting,
+  confirmationPending,
   validationFailure,
   success,
   failure,
@@ -22,6 +23,11 @@ class PublishArticleState extends Equatable {
   final List<PublishArticleValidationError> validationErrors;
   final PublishableArticle? publishedArticle;
   final String? failureMessage;
+  final String? pendingArticleId;
+
+  static const confirmationPendingMessage =
+      'Publication confirmation is pending. The article may still be published. '
+      'You can go back or check confirmation; no new article will be submitted.';
 
   PublishArticleState({
     this.author = '',
@@ -33,6 +39,7 @@ class PublishArticleState extends Equatable {
     List<PublishArticleValidationError> validationErrors = const [],
     this.publishedArticle,
     this.failureMessage,
+    this.pendingArticleId,
   }) : validationErrors =
             List<PublishArticleValidationError>.unmodifiable(validationErrors);
 
@@ -49,6 +56,8 @@ class PublishArticleState extends Equatable {
     bool clearPublishedArticle = false,
     String? failureMessage,
     bool clearFailureMessage = false,
+    String? pendingArticleId,
+    bool clearPendingArticle = false,
   }) {
     return PublishArticleState(
       author: author ?? this.author,
@@ -63,6 +72,9 @@ class PublishArticleState extends Equatable {
           : publishedArticle ?? this.publishedArticle,
       failureMessage:
           clearFailureMessage ? null : failureMessage ?? this.failureMessage,
+      pendingArticleId: clearPendingArticle
+          ? null
+          : pendingArticleId ?? this.pendingArticleId,
     );
   }
 
@@ -86,6 +98,11 @@ class PublishArticleState extends Equatable {
 
   bool get isSuccess => status == PublishArticleStatus.success;
 
+  bool get isConfirmationPending =>
+      status == PublishArticleStatus.confirmationPending;
+
+  bool get isFormLocked => isSubmitting || isConfirmationPending;
+
   @override
   List<Object?> get props => [
         author,
@@ -97,5 +114,6 @@ class PublishArticleState extends Equatable {
         validationErrors,
         publishedArticle,
         failureMessage,
+        pendingArticleId,
       ];
 }

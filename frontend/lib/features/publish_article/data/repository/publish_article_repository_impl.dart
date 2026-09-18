@@ -1,6 +1,7 @@
 import '../../domain/entities/publishable_article.dart';
 import '../../domain/params/publish_article_params.dart';
 import '../../domain/repository/publish_article_repository.dart';
+import '../../domain/repository/publication_confirmation_pending.dart';
 import '../data_sources/article_firestore_data_source.dart';
 import '../data_sources/article_storage_data_source.dart';
 import '../data_sources/publication_data_source_exception.dart';
@@ -9,13 +10,22 @@ import '../models/publishable_article_model.dart';
 class PublishArticleRepositoryImpl implements PublishArticleRepository {
   final ArticleFirestoreDataSource _firestore;
   final ArticleStorageDataSource _storage;
+  final Duration confirmationWait;
   // Only unresolved attempts are retained, for the lifetime of this repository.
   final _pending = <_PublicationAttempt>[];
 
-  PublishArticleRepositoryImpl(this._firestore, this._storage);
+  PublishArticleRepositoryImpl(this._firestore, this._storage,
+      {this.confirmationWait = const Duration(seconds: 30)});
 
   @override
   Future<PublishableArticle> publishArticle(PublishArticleParams params) async {
+    // A different form (including a reopened route) must explicitly reconcile
+    // an uncertain publication before it can allocate another article ID.
+    for (final attempt in _pending) {
+      if (attempt.needsConfirmation && !attempt.matches(params)) {
+        throw PublicationConfirmationPending(attempt.id);
+      }
+    }
     final attempt = _pending.firstWhere(
       (attempt) => attempt.matches(params),
       orElse: () {
@@ -36,7 +46,17 @@ class PublishArticleRepositoryImpl implements PublishArticleRepository {
         return attempt;
       },
     );
-    // Multiple callers with equal input share the same in-flight operation.
+    return _runAttempt(attempt);
+  }
+
+  @override
+  Future<PublishableArticle> confirmPublication(String articleId) {
+    final attempt = _pending.firstWhere((attempt) => attempt.id == articleId);
+    return _runAttempt(attempt);
+  }
+
+  Future<PublishableArticle> _runAttempt(_PublicationAttempt attempt) async {
+    // Multiple callers share the same foreground operation, not another write.
     if (attempt.inFlight != null) return attempt.inFlight!;
     final operation = _publish(attempt);
     attempt.inFlight = operation;
@@ -51,9 +71,16 @@ class PublishArticleRepositoryImpl implements PublishArticleRepository {
 
   Future<PublishableArticle> _publish(_PublicationAttempt attempt) async {
     if (attempt.writeAttempted) {
-      final existing = await _findArticle(attempt);
+      PublishableArticleModel? existing;
+      try {
+        existing = await _findArticle(attempt);
+      } on PublicationDataSourceException {
+        if (attempt.needsConfirmation) throw _confirmationPending(attempt);
+        rethrow;
+      }
       if (existing != null) return existing.toEntity();
       if (attempt.writeAcknowledged) {
+        if (attempt.needsConfirmation) throw _confirmationPending(attempt);
         // Never repeat an acknowledged write just because confirmation failed.
         throw const PublicationDataSourceException(
           source: PublicationDataSource.firestore,
@@ -67,30 +94,63 @@ class PublishArticleRepositoryImpl implements PublishArticleRepository {
     await _ensureThumbnail(attempt);
     attempt.writeAttempted = true;
     try {
-      await _firestore.createArticle(
+      // Keep the native future after a foreground timeout: timeout does NOT
+      // cancel a queued Firestore write. Only a settled failure can release it.
+      attempt.writeFuture ??= _firestore.createArticle(
         articleId: attempt.id,
         params: attempt.params,
         thumbnailUrl: attempt.thumbnailUrl!,
       );
+      await attempt.writeFuture!.timeout(confirmationWait,
+          onTimeout: () => throw _confirmationPending(attempt));
       attempt.writeAcknowledged = true;
-    } catch (_) {
+    } on PublicationConfirmationPending {
+      rethrow;
+    } catch (error) {
+      attempt.writeFuture = null;
       // A rejected/uncertain write may refer to an earlier successful request.
       try {
         final existing = await _findArticle(attempt);
         if (existing != null) return existing.toEntity();
+      } on PublicationConfirmationPending {
+        // A stalled follow-up read must not hide a definite write rejection.
+        if (!_isDefinitiveWriteFailure(error)) rethrow;
       } catch (_) {
         // Keep the original write error and retain the attempt for a later retry.
       }
+      if (attempt.needsConfirmation && !_isDefinitiveWriteFailure(error)) {
+        throw _confirmationPending(attempt);
+      }
+      attempt.needsConfirmation = false;
       rethrow;
     }
 
     try {
       return (await _readConfirmed(attempt)).toEntity();
+    } on PublicationConfirmationPending {
+      rethrow;
     } catch (_) {
       // One bounded reconciliation read, never another upload or write.
-      return (await _readConfirmed(attempt)).toEntity();
+      try {
+        return (await _readConfirmed(attempt)).toEntity();
+      } catch (_) {
+        if (attempt.needsConfirmation) throw _confirmationPending(attempt);
+        rethrow;
+      }
     }
   }
+
+  PublicationConfirmationPending _confirmationPending(
+      _PublicationAttempt attempt) {
+    attempt.needsConfirmation = true;
+    return PublicationConfirmationPending(attempt.id);
+  }
+
+  bool _isDefinitiveWriteFailure(Object error) =>
+      error is PublicationDataSourceException &&
+      error.operation == PublicationDataSourceOperation.createArticle &&
+      const {'permission-denied', 'unauthenticated', 'invalid-argument'}
+          .contains(error.code);
 
   Future<void> _ensureThumbnail(_PublicationAttempt attempt) async {
     if (attempt.thumbnailUrl != null) return;
@@ -139,7 +199,10 @@ class PublishArticleRepositoryImpl implements PublishArticleRepository {
 
   Future<PublishableArticleModel> _readConfirmed(
       _PublicationAttempt attempt) async {
-    final model = await _firestore.getArticleById(attempt.id);
+    final model = await _firestore.getArticleById(attempt.id).timeout(
+          confirmationWait,
+          onTimeout: () => throw _confirmationPending(attempt),
+        );
     final params = attempt.params;
     if (model.id != attempt.id ||
         model.author != params.author ||
@@ -166,6 +229,8 @@ class _PublicationAttempt {
   bool uploadAttempted = false;
   bool writeAttempted = false;
   bool writeAcknowledged = false;
+  bool needsConfirmation = false;
+  Future<void>? writeFuture;
   Future<PublishableArticle>? inFlight;
 
   _PublicationAttempt(this.params, this.id, this.path);

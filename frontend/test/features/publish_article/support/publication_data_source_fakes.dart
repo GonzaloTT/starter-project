@@ -34,6 +34,8 @@ class PublicationFirestoreFake implements ArticleFirestoreDataSource {
   final reads = <Object>[];
   Object? idError;
   Object? createError;
+  Completer<void>? createGate;
+  Completer<void>? readGate;
   bool storeBeforeError = false;
   int ids = 0;
   PublishArticleParams? receivedParams;
@@ -54,6 +56,7 @@ class PublicationFirestoreFake implements ArticleFirestoreDataSource {
       required String thumbnailUrl}) async {
     events.add('create:$articleId');
     receivedParams = params;
+    if (createGate != null) await createGate!.future;
     if (createError == null || storeBeforeError) {
       documents[articleId] = PublishableArticleModel(
           id: articleId,
@@ -72,6 +75,7 @@ class PublicationFirestoreFake implements ArticleFirestoreDataSource {
   @override
   Future<PublishableArticleModel> getArticleById(String articleId) async {
     events.add('get:$articleId');
+    if (readGate != null) await readGate!.future;
     if (reads.isNotEmpty) {
       final result = reads.removeAt(0);
       if (result is PublishableArticleModel) return result;

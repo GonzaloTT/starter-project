@@ -22,6 +22,8 @@ import 'package:news_app_clean_architecture/features/publish_article/presentatio
 import 'package:news_app_clean_architecture/injection_container.dart';
 
 import '../../support/fake_publish_article_repository.dart';
+import '../../support/publication_data_source_fakes.dart';
+import 'package:news_app_clean_architecture/features/publish_article/data/repository/publish_article_repository_impl.dart';
 
 import 'publish_article_page_test.dart'
     show FakeArticleImagePicker, imageThumbnail, configurePhoneSize;
@@ -158,6 +160,88 @@ void main() {
     await pumpTransitions(tester);
     await tester.tap(find.byType(FloatingActionButton));
     await pumpTransitions(tester);
+  }
+
+  testWidgets(
+      'queued write unlocks navigation and offers same-attempt confirmation',
+      (tester) async {
+    final events = <String>[];
+    final firestore = PublicationFirestoreFake(events)
+      ..createGate = Completer<void>();
+    final cubit = PublishArticleCubit(PublishArticleUseCase(
+        PublishArticleRepositoryImpl(
+            firestore, PublicationStorageFake(events))));
+    await openForm(tester, cubit);
+    await fillForm(tester);
+    await tester.tap(submit);
+    await tester.pump();
+    expect(cubit.state.isSubmitting, isTrue);
+    await tester.pump(const Duration(seconds: 30));
+    await tester.pump();
+    expect(cubit.state.isConfirmationPending, isTrue);
+    expect(find.text(PublishArticleState.confirmationPendingMessage),
+        findsOneWidget);
+    expect(find.text('Check confirmation'), findsOneWidget);
+    expect(find.text('Unable to publish the article. Please try again.'),
+        findsNothing);
+    expect(find.text(successMessage), findsNothing);
+    expect(tester.widget<ElevatedButton>(submit).onPressed, isNotNull);
+    expect(
+        tester
+            .widget<PopScope>(find.byWidgetPredicate((w) => w is PopScope))
+            .canPop,
+        isTrue);
+    for (final field in tester.widgetList<TextField>(find.byType(TextField))) {
+      expect(field.enabled, isFalse);
+    }
+    await tester.tap(submit);
+    await tester.pump();
+    await tester.tap(submit);
+    expect(events.where((e) => e.startsWith('create:')), hasLength(1));
+    firestore.createGate!.complete();
+    await pumpTransitions(tester);
+    expect(observer.pops, 1);
+    expect(find.text(successMessage), findsOneWidget);
+    expect(firestore.ids, 1);
+    expect(events.where((e) => e.startsWith('upload:')), hasLength(1));
+    expect(events.where((e) => e.startsWith('create:')), hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final systemBack in [false, true]) {
+    testWidgets(
+        'pending confirmation permits back and retains recovery: system=$systemBack',
+        (tester) async {
+      final events = <String>[];
+      final firestore = PublicationFirestoreFake(events)
+        ..createGate = Completer<void>();
+      final repository = PublishArticleRepositoryImpl(
+          firestore, PublicationStorageFake(events));
+      final cubit = PublishArticleCubit(PublishArticleUseCase(repository));
+      await openForm(tester, cubit);
+      await fillForm(tester);
+      await tester.tap(submit);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pump();
+      if (systemBack) {
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(find.byKey(const Key('publishArticleBackButton')));
+      }
+      await pumpTransitions(tester);
+      expect(observer.pops, 1);
+      expect(find.byType(PublishArticlePage), findsNothing);
+      expect(find.text(successMessage), findsNothing);
+      firestore.createGate!.complete();
+      await tester.pump();
+      expect(
+          (await repository.confirmPublication('article-1')).id, 'article-1');
+      expect(firestore.ids, 1);
+      expect(events.where((e) => e.startsWith('create:')), hasLength(1));
+      expect(find.text(successMessage), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets(

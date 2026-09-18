@@ -20,13 +20,21 @@ class PublishArticleValidationError {
 class PublishArticleResult {
   final PublishableArticle? article;
   final List<PublishArticleValidationError> errors;
+  final String? pendingArticleId;
 
   const PublishArticleResult.success(PublishableArticle this.article)
-      : errors = const [];
+      : errors = const [],
+        pendingArticleId = null;
+
+  const PublishArticleResult.confirmationPending(String articleId)
+      : article = null,
+        errors = const [],
+        pendingArticleId = articleId;
 
   PublishArticleResult.validationFailure(
     List<PublishArticleValidationError> errors,
   )   : article = null,
+        pendingArticleId = null,
         errors = List<PublishArticleValidationError>.unmodifiable(errors) {
     if (this.errors.isEmpty) {
       throw ArgumentError.value(errors, 'errors', 'Must not be empty.');

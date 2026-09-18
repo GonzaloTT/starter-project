@@ -2,6 +2,7 @@ import '../../../../core/usecase/usecase.dart';
 import '../entities/article_thumbnail.dart';
 import '../params/publish_article_params.dart';
 import '../repository/publish_article_repository.dart';
+import '../repository/publication_confirmation_pending.dart';
 import 'publish_article_result.dart';
 
 class PublishArticleUseCase
@@ -57,18 +58,31 @@ class PublishArticleUseCase
       return PublishArticleResult.validationFailure(errors);
     }
 
-    final article = await _repository.publishArticle(PublishArticleParams(
-      author: author,
-      title: title,
-      description: description,
-      content: content,
-      thumbnail: ArticleThumbnail(
-        fileName: fileName,
-        mimeType: params.thumbnail.mimeType,
-        bytes: params.thumbnail.bytes,
-      ),
-    ));
-    return PublishArticleResult.success(article);
+    try {
+      final article = await _repository.publishArticle(PublishArticleParams(
+        author: author,
+        title: title,
+        description: description,
+        content: content,
+        thumbnail: ArticleThumbnail(
+          fileName: fileName,
+          mimeType: params.thumbnail.mimeType,
+          bytes: params.thumbnail.bytes,
+        ),
+      ));
+      return PublishArticleResult.success(article);
+    } on PublicationConfirmationPending catch (pending) {
+      return PublishArticleResult.confirmationPending(pending.articleId);
+    }
+  }
+
+  Future<PublishArticleResult> confirm(String articleId) async {
+    try {
+      final article = await _repository.confirmPublication(articleId);
+      return PublishArticleResult.success(article);
+    } on PublicationConfirmationPending catch (pending) {
+      return PublishArticleResult.confirmationPending(pending.articleId);
+    }
   }
 
   void _validateText(

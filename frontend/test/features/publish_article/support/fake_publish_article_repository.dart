@@ -9,6 +9,11 @@ class FakePublishArticleRepository implements PublishArticleRepository {
   FakePublishArticleRepository({this.handler});
 
   @override
+  Future<PublishableArticle> confirmPublication(String articleId) {
+    throw StateError('This fake has no retained publication attempt.');
+  }
+
+  @override
   Future<PublishableArticle> publishArticle(PublishArticleParams params) async {
     calls.add(params);
     if (handler != null) return handler!(params);

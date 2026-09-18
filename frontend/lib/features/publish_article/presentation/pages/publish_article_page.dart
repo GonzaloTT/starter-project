@@ -104,7 +104,7 @@ class _PublishArticlePageState extends State<PublishArticlePage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _ArticleTextField(
-                        enabled: !state.isSubmitting,
+                        enabled: !state.isFormLocked,
                         key: _errorTargets[PublishArticleField.title],
                         fieldKey: const Key('publishArticleTitleField'),
                         hintText: 'Write your title here...',
@@ -116,7 +116,7 @@ class _PublishArticlePageState extends State<PublishArticlePage> {
                       ),
                       const SizedBox(height: 16),
                       _ArticleTextField(
-                        enabled: !state.isSubmitting,
+                        enabled: !state.isFormLocked,
                         fieldKey: const Key('publishArticleAuthorField'),
                         key: _errorTargets[PublishArticleField.author],
                         hintText: 'Write the author here...',
@@ -127,7 +127,7 @@ class _PublishArticlePageState extends State<PublishArticlePage> {
                       ),
                       const SizedBox(height: 16),
                       _ArticleTextField(
-                        enabled: !state.isSubmitting,
+                        enabled: !state.isFormLocked,
                         fieldKey: const Key('publishArticleDescriptionField'),
                         key: _errorTargets[PublishArticleField.description],
                         hintText: 'Write a short description...',
@@ -148,7 +148,7 @@ class _PublishArticlePageState extends State<PublishArticlePage> {
                           imagePicker: widget.imagePicker),
                       const SizedBox(height: 24),
                       _ArticleTextField(
-                        enabled: !state.isSubmitting,
+                        enabled: !state.isFormLocked,
                         fieldKey: const Key('publishArticleContentField'),
                         key: _errorTargets[PublishArticleField.content],
                         hintText: 'Add article here...',
@@ -173,41 +173,60 @@ class _PublishArticlePageState extends State<PublishArticlePage> {
                   top: false,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(24, 10, 24, 16),
-                    child: SizedBox(
-                      height: 58,
-                      child: ElevatedButton.icon(
-                        key: const Key('publishArticleSubmitButton'),
-                        onPressed: state.isSubmitting
-                            ? null
-                            : context.read<PublishArticleCubit>().publish,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primaryContainer,
-                          foregroundColor: Colors.black87,
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (state.pendingArticleId != null)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              PublishArticleState.confirmationPendingMessage,
+                              key: Key('publishArticleConfirmationPending'),
+                            ),
+                          ),
+                        SizedBox(
+                          height: 58,
+                          child: ElevatedButton.icon(
+                            key: const Key('publishArticleSubmitButton'),
+                            onPressed: state.isSubmitting
+                                ? null
+                                : context.read<PublishArticleCubit>().publish,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
+                              foregroundColor: Colors.black87,
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: state.isSubmitting
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.login),
+                            label: Text(
+                              state.isSubmitting
+                                  ? (state.pendingArticleId != null
+                                      ? 'Checking confirmation...'
+                                      : 'Publishing...')
+                                  : (state.isConfirmationPending
+                                      ? 'Check confirmation'
+                                      : 'Publish Article'),
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ),
-                        icon: state.isSubmitting
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.login),
-                        label: Text(
-                          state.isSubmitting
-                              ? 'Publishing...'
-                              : 'Publish Article',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
+                      ],
                     ),
                   ),
                 );
@@ -248,7 +267,7 @@ class _ThumbnailSectionState extends State<_ThumbnailSection> {
     setState(() => _isPicking = true);
     try {
       final thumbnail = await widget.imagePicker.pickImage();
-      if (!mounted || cubit.isClosed || cubit.state.isSubmitting) return;
+      if (!mounted || cubit.isClosed || cubit.state.isFormLocked) return;
       if (thumbnail != null) cubit.thumbnailSelected(thumbnail);
     } catch (_) {
       if (!mounted) return;
@@ -271,7 +290,7 @@ class _ThumbnailSectionState extends State<_ThumbnailSection> {
         ElevatedButton.icon(
           key: const Key('publishArticleAttachImageButton'),
           onPressed:
-              _isPicking || widget.state.isSubmitting ? null : _pickImage,
+              _isPicking || widget.state.isFormLocked ? null : _pickImage,
           style: ElevatedButton.styleFrom(
             backgroundColor: Theme.of(context).colorScheme.primaryContainer,
             foregroundColor: Colors.black87,
@@ -311,7 +330,7 @@ class _ThumbnailSectionState extends State<_ThumbnailSection> {
           Text(thumbnail.fileName, textAlign: TextAlign.center),
           TextButton.icon(
             key: const Key('publishArticleRemoveImageButton'),
-            onPressed: _isPicking || widget.state.isSubmitting
+            onPressed: _isPicking || widget.state.isFormLocked
                 ? null
                 : context.read<PublishArticleCubit>().thumbnailRemoved,
             icon: const Icon(Icons.delete_outline),

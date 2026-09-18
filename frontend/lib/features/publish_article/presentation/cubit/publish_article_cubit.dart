@@ -13,7 +13,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
       : super(PublishArticleState());
 
   void authorChanged(String value) {
-    if (state.isSubmitting) return;
+    if (state.isFormLocked) return;
     emit(
       state.copyWith(
         author: value,
@@ -28,7 +28,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
   }
 
   void titleChanged(String value) {
-    if (state.isSubmitting) return;
+    if (state.isFormLocked) return;
     emit(
       state.copyWith(
         title: value,
@@ -43,7 +43,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
   }
 
   void descriptionChanged(String value) {
-    if (state.isSubmitting) return;
+    if (state.isFormLocked) return;
     emit(
       state.copyWith(
         description: value,
@@ -58,7 +58,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
   }
 
   void contentChanged(String value) {
-    if (state.isSubmitting) return;
+    if (state.isFormLocked) return;
     emit(
       state.copyWith(
         content: value,
@@ -73,7 +73,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
   }
 
   void thumbnailSelected(ArticleThumbnail thumbnail) {
-    if (state.isSubmitting) return;
+    if (state.isFormLocked) return;
     emit(
       state.copyWith(
         thumbnail: thumbnail,
@@ -90,7 +90,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
   }
 
   void thumbnailRemoved() {
-    if (state.isSubmitting) return;
+    if (state.isFormLocked) return;
     emit(
       state.copyWith(
         clearThumbnail: true,
@@ -136,9 +136,22 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
     );
 
     try {
-      final result = await _publishArticleUseCase(params: params);
+      final pendingId = state.pendingArticleId;
+      final result = pendingId == null
+          ? await _publishArticleUseCase(params: params)
+          : await _publishArticleUseCase.confirm(pendingId);
 
       if (isClosed) {
+        return;
+      }
+
+      if (result.pendingArticleId != null) {
+        emit(state.copyWith(
+          status: PublishArticleStatus.confirmationPending,
+          pendingArticleId: result.pendingArticleId,
+          clearPublishedArticle: true,
+          clearFailureMessage: true,
+        ));
         return;
       }
 
@@ -146,6 +159,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
         emit(
           state.copyWith(
             status: PublishArticleStatus.validationFailure,
+            clearPendingArticle: true,
             validationErrors: result.errors,
             clearPublishedArticle: true,
             clearFailureMessage: true,
@@ -164,6 +178,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
       emit(
         state.copyWith(
           status: PublishArticleStatus.success,
+          clearPendingArticle: true,
           validationErrors: const [],
           publishedArticle: article,
           clearFailureMessage: true,
@@ -177,6 +192,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
       emit(
         state.copyWith(
           status: PublishArticleStatus.failure,
+          clearPendingArticle: true,
           validationErrors: const [],
           clearPublishedArticle: true,
           failureMessage: 'Unable to publish the article. Please try again.',

@@ -5,6 +5,7 @@ import 'package:news_app_clean_architecture/features/publish_article/data/data_s
 import 'package:news_app_clean_architecture/features/publish_article/data/models/publishable_article_model.dart';
 import 'package:news_app_clean_architecture/features/publish_article/data/repository/publish_article_repository_impl.dart';
 import 'package:news_app_clean_architecture/features/publish_article/domain/entities/publishable_article.dart';
+import 'package:news_app_clean_architecture/features/publish_article/domain/repository/publication_confirmation_pending.dart';
 
 import '../../support/publication_data_source_fakes.dart';
 
@@ -26,6 +27,134 @@ void main() {
     firestore = PublicationFirestoreFake(events);
     storage = PublicationStorageFake(events);
     repository = PublishArticleRepositoryImpl(firestore, storage);
+  });
+
+  group('bounded confirmation of a queued write', () {
+    final pending = throwsA(isA<PublicationConfirmationPending>()
+        .having((result) => result.articleId, 'article ID', 'article-1'));
+
+    setUp(() {
+      firestore.createGate = Completer<void>();
+      repository = PublishArticleRepositoryImpl(firestore, storage,
+          confirmationWait: const Duration(milliseconds: 10));
+    });
+
+    test('timeout and repeated checks retain one native write and storage path',
+        () async {
+      await expectLater(repository.publishArticle(publicationInput()), pending);
+      await expectLater(repository.confirmPublication('article-1'), pending);
+      await expectLater(repository.publishArticle(publicationInput()), pending);
+      expect(firestore.createGate!.isCompleted, isFalse);
+      expect(firestore.ids, 1);
+      expect(events.where((e) => e.startsWith('upload:')), ['upload:$path']);
+      expect(
+          events.where((e) => e.startsWith('create:')), ['create:article-1']);
+    });
+
+    test('different input cannot allocate a second article while unresolved',
+        () async {
+      await expectLater(repository.publishArticle(publicationInput()), pending);
+      await expectLater(
+          repository.publishArticle(publicationInput(title: 'Changed')),
+          pending);
+      expect(firestore.ids, 1);
+      expect(events.where((e) => e.startsWith('create:')), hasLength(1));
+    });
+
+    test('delayed acknowledgment is confirmed on the same attempt', () async {
+      await expectLater(repository.publishArticle(publicationInput()), pending);
+      final recovery = repository.confirmPublication('article-1');
+      firestore.createGate!.complete();
+      final article = await recovery;
+      expect(article.id, 'article-1');
+      expect(article.thumbnailUrl, storage.objects[path]);
+      expect(firestore.ids, 1);
+      expect(events.where((e) => e.startsWith('create:')), hasLength(1));
+      expect(events.where((e) => e.startsWith('upload:')), hasLength(1));
+      // Once explicitly confirmed, deliberate later publications remain valid.
+      expect((await repository.publishArticle(publicationInput())).id,
+          'article-2');
+    });
+
+    test(
+        'server read can confirm persistence even before native acknowledgment',
+        () async {
+      final input = publicationInput();
+      await expectLater(repository.publishArticle(input), pending);
+      firestore.documents['article-1'] = PublishableArticleModel(
+        id: 'article-1',
+        author: input.author,
+        title: input.title,
+        description: input.description,
+        content: input.content,
+        thumbnailUrl: storage.objects[path]!,
+        publishedAt: DateTime.utc(2026),
+        createdAt: DateTime.utc(2026),
+        updatedAt: DateTime.utc(2026),
+      );
+      expect(
+          (await repository.confirmPublication('article-1')).id, 'article-1');
+      expect(firestore.createGate!.isCompleted, isFalse);
+      expect(events.where((e) => e.startsWith('create:')), hasLength(1));
+      // A late error on the original future must remain observed after timeout.
+      firestore.createGate!.completeError(writeError);
+      await Future<void>.delayed(Duration.zero);
+    });
+
+    test(
+        'unavailable or stalled confirmation stays pending without another write',
+        () async {
+      await expectLater(repository.publishArticle(publicationInput()), pending);
+      firestore.reads.add(readError);
+      await expectLater(repository.confirmPublication('article-1'), pending);
+      firestore.readGate = Completer<void>();
+      await expectLater(repository.confirmPublication('article-1'), pending);
+      expect(events.where((e) => e.startsWith('create:')), hasLength(1));
+      expect(firestore.ids, 1);
+    });
+
+    test('delayed definite rejection preserves failure and same-ID retry',
+        () async {
+      await expectLater(repository.publishArticle(publicationInput()), pending);
+      final denied = dataError(PublicationDataSource.firestore,
+          PublicationDataSourceOperation.createArticle, 'permission-denied');
+      firestore.createGate!.completeError(denied);
+      await expectLater(
+          repository.confirmPublication('article-1'), throwsA(same(denied)));
+      firestore.createGate = null;
+      expect((await repository.publishArticle(publicationInput())).id,
+          'article-1');
+      expect(firestore.ids, 1);
+      expect(events.where((e) => e.startsWith('upload:')), hasLength(1));
+    });
+
+    test('concurrent checks still share one foreground operation', () async {
+      await expectLater(repository.publishArticle(publicationInput()), pending);
+      await Future.wait([
+        expectLater(repository.confirmPublication('article-1'), pending),
+        expectLater(repository.confirmPublication('article-1'), pending),
+      ]);
+      expect(events.where((e) => e.startsWith('get:')), hasLength(1));
+      expect(events.where((e) => e.startsWith('create:')), hasLength(1));
+    });
+
+    test('a stalled reconciliation read does not hide a definite rejection',
+        () async {
+      final denied = dataError(PublicationDataSource.firestore,
+          PublicationDataSourceOperation.createArticle, 'permission-denied');
+      firestore
+        ..createGate = null
+        ..createError = denied
+        ..readGate = Completer<void>();
+      await expectLater(
+          repository.publishArticle(publicationInput()), throwsA(same(denied)));
+      firestore
+        ..createError = null
+        ..readGate = null;
+      expect((await repository.publishArticle(publicationInput())).id,
+          'article-1');
+      expect(firestore.ids, 1);
+    });
   });
 
   for (final entry in {

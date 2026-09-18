@@ -10,6 +10,9 @@ import 'package:news_app_clean_architecture/features/publish_article/presentatio
 import 'package:news_app_clean_architecture/features/publish_article/presentation/cubit/publish_article_state.dart';
 
 import '../../support/fake_publish_article_repository.dart';
+import '../../support/publication_data_source_fakes.dart';
+import 'package:news_app_clean_architecture/features/publish_article/data/repository/publish_article_repository_impl.dart';
+import 'package:news_app_clean_architecture/features/publish_article/data/data_sources/publication_data_source_exception.dart';
 
 class ControlledPublishArticleUseCase extends PublishArticleUseCase {
   final Future<PublishArticleResult> Function(PublishArticleParams params)
@@ -61,6 +64,99 @@ void completeValidForm(PublishArticleCubit cubit) {
 }
 
 void main() {
+  test(
+      'real repository timeout exits submitting; checking confirms the same ID',
+      () async {
+    final events = <String>[];
+    final firestore = PublicationFirestoreFake(events)
+      ..createGate = Completer<void>();
+    final repository = PublishArticleRepositoryImpl(
+        firestore, PublicationStorageFake(events),
+        confirmationWait: const Duration(milliseconds: 10));
+    final cubit = PublishArticleCubit(PublishArticleUseCase(repository));
+    addTearDown(cubit.close);
+    completeValidForm(cubit);
+    final transitions = expectLater(
+        cubit.stream.map((state) => state.status),
+        emitsInOrder([
+          PublishArticleStatus.submitting,
+          PublishArticleStatus.confirmationPending
+        ]));
+    await cubit.publish();
+    await transitions;
+    expect(cubit.state.isSubmitting, isFalse);
+    expect(cubit.state.pendingArticleId, 'article-1');
+    expect(cubit.state.failureMessage, isNull);
+    expect(cubit.state.publishedArticle, isNull);
+    expect(cubit.state.validationErrors, isEmpty);
+    final pending = cubit.state;
+    cubit.authorChanged('Other');
+    cubit.titleChanged('Other');
+    cubit.descriptionChanged('Other');
+    cubit.contentChanged('Other');
+    cubit.thumbnailRemoved();
+    cubit.thumbnailSelected(validThumbnail());
+    expect(cubit.state, same(pending));
+    await cubit.publish();
+    expect(cubit.state.isConfirmationPending, isTrue);
+    firestore.createGate!.complete();
+    await cubit.publish();
+    expect(cubit.state.isSuccess, isTrue);
+    expect(cubit.state.pendingArticleId, isNull);
+    expect(cubit.state.publishedArticle!.id, 'article-1');
+    expect(firestore.ids, 1);
+    expect(events.where((e) => e.startsWith('create:')), hasLength(1));
+  });
+
+  test('reopened form checks the retained attempt by ID, not its new fields',
+      () async {
+    final events = <String>[];
+    final firestore = PublicationFirestoreFake(events)
+      ..createGate = Completer<void>();
+    final useCase = PublishArticleUseCase(PublishArticleRepositoryImpl(
+        firestore, PublicationStorageFake(events),
+        confirmationWait: const Duration(milliseconds: 10)));
+    final first = PublishArticleCubit(useCase);
+    completeValidForm(first);
+    await first.publish();
+    await first.close();
+    final reopened = PublishArticleCubit(useCase);
+    addTearDown(reopened.close);
+    completeValidForm(reopened);
+    reopened.titleChanged('A different form');
+    await reopened.publish();
+    expect(reopened.state.pendingArticleId, 'article-1');
+    firestore.createGate!.complete();
+    await reopened.publish();
+    expect(reopened.state.publishedArticle!.title, 'Article title');
+    expect(firestore.ids, 1);
+    expect(events.where((e) => e.startsWith('create:')), hasLength(1));
+  });
+
+  test('delayed definite rejection exits pending and unlocks editing',
+      () async {
+    final events = <String>[];
+    final firestore = PublicationFirestoreFake(events)
+      ..createGate = Completer<void>();
+    final cubit = PublishArticleCubit(PublishArticleUseCase(
+        PublishArticleRepositoryImpl(firestore, PublicationStorageFake(events),
+            confirmationWait: const Duration(milliseconds: 10))));
+    addTearDown(cubit.close);
+    completeValidForm(cubit);
+    await cubit.publish();
+    firestore.createGate!.completeError(dataError(
+        PublicationDataSource.firestore,
+        PublicationDataSourceOperation.createArticle,
+        'permission-denied'));
+    await cubit.publish();
+    expect(cubit.state.status, PublishArticleStatus.failure);
+    expect(cubit.state.pendingArticleId, isNull);
+    expect(cubit.state.failureMessage, isNotNull);
+    expect(cubit.state.isFormLocked, isFalse);
+    cubit.titleChanged('Corrected title');
+    expect(cubit.state.title, 'Corrected title');
+  });
+
   test('pending publication ignores every edit and keeps original parameters',
       () async {
     final gate = Completer<PublishArticleResult>();

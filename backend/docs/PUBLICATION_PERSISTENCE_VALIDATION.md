@@ -5,14 +5,16 @@
 Unit 5 is omitted. No `confirmationPending`, new packages, credentials,
 production configuration changes or rule changes are introduced.
 
-The user selected service integrations with the existing Firebase JavaScript SDK
+The automated service integrations use the existing Firebase JavaScript SDK
 (12.19.0). These tests do **not** execute Flutter datasources, repository, GetIt,
-native Android plugins or UI. Flutter coverage remains unit/widget tests with
-controlled doubles, static analysis and APK compilation.
+native Android plugins or UI. The complete Flutter-to-Firebase publication flow
+was therefore validated separately through a controlled manual run on a physical
+Android device against the configured Firebase project.
 
 ## Repeatable execution and protections
 
 Requirements: Node.js >=20, installed backend dependencies, Firebase CLI, Java 21.
+
 From `backend`, run sequentially:
 
 ```sh
@@ -54,7 +56,7 @@ variables, a real-project name, wrong/remote endpoints and unsafe download URLs.
 Direct invocation of the integration file without this environment intentionally
 fails closed.
 
-## Coverage and observed limitation
+## Automated coverage and observed limitation
 
 ### Firestore emulator: 6 tests
 
@@ -68,8 +70,9 @@ fails closed.
 - Deny update/delete of an existing document and confirm unchanged content.
 - Deny missing/extra fields, wrong type and non-server creation timestamp.
 
-The thumbnail HTTPS Firebase Storage URL is a **schema fixture only**. It has no
-uploaded object, is never fetched, and is not end-to-end publication evidence.
+The thumbnail HTTPS Firebase Storage URL used by the isolated Firestore tests is a
+**schema fixture only**. It has no uploaded object, is never fetched, and is not
+end-to-end publication evidence.
 
 ### Storage emulator: 5 tests
 
@@ -87,123 +90,151 @@ The existing 52-rule suite also covers JPEG/WebP and the 5 MiB boundaries.
 
 Upload an image, get its actual URL, and try creating the matching article with
 that unchanged URL. The observed URL is `http://127.0.0.1:19199/...`, which fails
-the required `https://firebasestorage.googleapis.com/...` pattern. Assert creation
-is denied, the article is absent and the uploaded image still exists.
+the required `https://firebasestorage.googleapis.com/...` pattern. The test asserts
+that creation is denied, the article is absent and the uploaded image still exists.
 
 This expected rejection passes the negative test. It is **not** a successful
 integral publication. No HTTPS substitution, alternate rule, proxy, mixed real/
 emulated service or emulator-specific production branch is used.
 
-### Flutter integration feasibility
+### Flutter-to-emulator feasibility
 
-The frontend lacks `integration_test` and a native integration entry point. The
-user chose not to add that dependency in this unit. No Flutter-to-emulator test
-was added or run. Even with a harness, the unchanged integral flow would remain
-blocked by the observed URL mismatch.
+The frontend does not include `integration_test` or a native integration entry
+point. No Flutter-to-emulator test was added. Even with such a harness, the
+unchanged integral flow would remain blocked by the observed Storage emulator URL
+mismatch.
 
-A future isolated Flutter service harness must use a separate demo Firebase app
-and explicitly connect BOTH services before any calls; it must not invoke the
-normal production `main()` or Firebase options. No production change is needed now.
+The production implementation was not changed to accommodate emulator behavior.
+Instead, the complete Flutter-to-Firebase flow was validated manually against the
+configured Firebase project after the emulator-based checks passed.
 
-## Pending manual Android / Firebase Console checklist
+## Manual Android / Firebase validation
 
-**Prepared only. None of these real-project steps were executed in Unit 6.**
-Perform one controlled run when real-project testing is explicitly authorized.
+A controlled real-project validation was performed on 2026-09-18 after completing
+the automated checks.
 
-### 1. Prepare the run
+### Environment
 
-- APK: `frontend/build/app/outputs/flutter-apk/app-debug.apk`.
+- Firebase project: `symmetry-technical-test-62d73`.
+- Storage bucket: `symmetry-technical-test-62d73.firebasestorage.app`.
 - Android application ID: `com.example.news_app_clean_architecture`.
-- Console project: `symmetry-technical-test-62d73`.
-- Bucket: `symmetry-technical-test-62d73.firebasestorage.app`.
-- Image: ordinary, non-sensitive JPEG named `symmetry-u6-01.jpg`, around 800x600
-  pixels, preferably below 500 KiB and always <=5,242,880 bytes. Record its byte
-  size. Do not merely rename HEIC/GIF to JPEG.
-- Record APK build/commit, device model, Android version, time and timezone.
-- Use marker `20260918-01` for this first run; increment it for subsequent runs.
+- Device: physical Android device running Android 16 (API 36).
+- Build: debug APK generated successfully from the current
+  `feature/technical-test` implementation.
+- Test image: JPEG selected from the Android gallery.
 
-### 2. Exact input
+No Firebase rules, production configuration or application code were changed
+during this validation.
 
-| Field | Value |
-| --- | --- |
-| Author | `Symmetry QA` |
-| Title | `Symmetry U6 - persistencia Android - 20260918-01` |
-| Description | `Prueba manual de persistencia Firestore y Storage. Ejecucion 20260918-01.` |
-| Content | `Articulo de prueba creado desde Android para validar la publicacion real. Marcador: 20260918-01. Debe conservarse al cerrar y volver a abrir la aplicacion.` |
-| Image | JPEG described above, selected from the gallery |
+### Observed application flow
 
-### 3. Expected application behavior
+The publication form was completed and a JPEG image was selected from the Android
+gallery. Publishing was triggered once.
 
-1. Open the publication form from Home. Capture filled fields and image preview.
-2. Tap Publish once. Expect loading and disabled submit while pending, then return
-   to Home and `Article published successfully.`
-3. The new article is **not expected in Home's NewsAPI feed**; it is unchanged.
-4. On failure, preserve the form and collect evidence. Do not repeatedly submit
-   or edit content before investigating the existing attempt.
-5. After confirmed success, close the app completely and reopen it. Refresh the
-   same document/object in Console and verify both persist. Reopening Home alone
-   cannot establish persistence because it does not read Firestore articles.
+The application:
 
-### 4. Firestore checks
+1. Entered its publishing/loading state.
+2. Disabled publication-related controls while the operation was pending.
+3. Completed the publication without displaying an application error.
+4. Returned to Home.
+5. Displayed `Article published successfully.`
 
-In Firestore Database's data view, locate the document in `articles` with the exact
-run title. Record its generated document ID as `articleId`. Review exactly:
+The existing Home feed remained backed by NewsAPI, so the newly published
+Firestore article was not expected to appear in that feed.
 
-| Field | Expected type/value |
-| --- | --- |
-| `author` | String: exact author above |
-| `title` | String: exact title above |
-| `description` | String: exact description above |
-| `content` | String: exact content above |
-| `thumbnailURL` | String: real HTTPS Firebase Storage download URL |
-| `publishedAt` | Timestamp near publication time |
-| `createdAt` | Timestamp near publication time |
-| `updatedAt` | Timestamp near publication time |
+### Firestore verification
 
-The three timestamps should be equal for this creation flow (Console may render
-local time). No `id`, bytes, `storagePath` or status belongs inside the document.
-Check that the URL decodes to the project's bucket and
-`media/articles/{articleId}/thumbnail.jpg`; open it and verify the selected image.
+Firebase Console showed a new document in the `articles` collection after the
+publication completed.
 
-### 5. Storage checks
+The document contained exactly the expected eight fields:
 
-Inspect exactly `media/articles/{articleId}/thumbnail.jpg` in Storage's files view.
-Its folder ID must equal the Firestore document ID. Verify `contentType=image/jpeg`,
-size matching selected source bytes and <=5 MiB, creation time near the run and the
-correct image preview. The safe uploaded name is `thumbnail.jpg`, regardless of
-the original gallery filename.
+- `author`
+- `title`
+- `description`
+- `content`
+- `thumbnailURL`
+- `publishedAt`
+- `createdAt`
+- `updatedAt`
 
-### 6. Evidence before cleanup
+`thumbnailURL` contained a real HTTPS Firebase Storage URL. The three date fields
+were stored as Firebase timestamps and resolved to the publication time.
 
-- Filled form and selected image preview.
-- Loading state if practical, and Home's transient success message; a short screen
-  recording can capture both.
-- Firestore document ID, eight fields, timestamp types/values.
-- Storage bucket/path, matching ID, MIME, size and preview.
-- Successful image display through its download URL.
-- The same document/object after closing/reopening the app and refreshing Console.
-- Run marker, APK build, device and timestamps alongside the captures.
-- Redact download-token query strings in shared screenshots/reports; retain the
-  bucket/path evidence without sharing bearer download tokens.
+The generated document ID observed during the validation was:
 
-### 7. Manual cleanup in Console after collecting evidence
+```text
+WykV2RmVV6DYSbSqfY0v
+```
 
-1. Close the Android app so it has no pending publication operation.
-2. Reconfirm the project name, run marker and exact recorded `articleId`.
-3. Delete **only** `articles/{articleId}` using Firestore Console's document delete
-   action. Do not delete the collection.
-4. Delete **only** `media/articles/{articleId}/thumbnail.jpg` in Storage Console.
-   Do not delete the bucket or unrelated folders; empty virtual folders may vanish.
-5. Refresh both views, verify both exact resources are absent and capture cleanup
-   evidence. Review any additional objects from failed attempts individually.
+### Storage verification
 
-An authorized Console administrator performs cleanup. Do not change client rules,
-add Flutter delete operations or deploy anything. These are two separate deletions,
-not an atomic operation.
+Firebase Storage showed a corresponding directory under:
+
+```text
+media/articles/WykV2RmVV6DYSbSqfY0v/
+```
+
+The Storage article directory therefore used the same generated ID as the
+Firestore document, confirming that both persisted resources belong to the same
+publication attempt.
+
+### Persistence after application restart
+
+After the successful publication, the Android application was completely closed.
+The active `flutter run` debugging session consequently lost its connection to the
+device.
+
+The application was then opened again independently on the Android device.
+Firebase Console was refreshed after reopening the application.
+
+The same Firestore document and corresponding Storage directory were still
+present. This confirms that the uploaded publication data is persisted remotely
+in Firebase and is not dependent on the Flutter application's in-memory state or
+the active debugging session.
+
+## Test data cleanup
+
+The resources created by this manual validation are test data. After preserving
+the required evidence, they may be removed manually from Firebase Console.
+
+Only the resources associated with the recorded test document ID should be
+removed:
+
+```text
+articles/WykV2RmVV6DYSbSqfY0v
+media/articles/WykV2RmVV6DYSbSqfY0v/
+```
+
+Existing fixtures such as `sample-article` and unrelated Firebase resources must
+not be modified.
+
+Cleanup consists of two separate operations:
+
+1. Delete only the test document from Firestore.
+2. Delete only the corresponding test image/object from Storage.
+
+No application delete functionality, rule changes or deployment are required for
+cleanup.
 
 ## Validation record
 
-On 2026-09-18: 52/52 original rules tests passed; the new emulator command passed
-20/20 tests (8 safety units + 12 integrations). The real local URL rejection was
-observed with unchanged rules. Flutter validation results are reported separately
-in the task. No real Firebase project validation has been performed by this unit.
+Validation completed on 2026-09-18:
+
+- 8/8 emulator safety tests passed.
+- 52/52 original Firebase rules tests passed.
+- 20/20 new emulator suite tests passed: 8 safety tests and 12 service
+  integration tests.
+- 171/171 Flutter tests passed.
+- `flutter analyze` completed with no analysis errors; existing non-blocking
+  diagnostics remain.
+- The Android debug APK built successfully.
+- The Storage emulator local-URL incompatibility was reproduced and documented
+  without changing Firebase rules.
+- A real Android publication successfully created the corresponding Firebase
+  Storage and Cloud Firestore resources.
+- The Firestore document and Storage resource remained present after completely
+  closing and reopening the Android application.
+
+The Data Layer publication path is therefore validated both through repeatable
+automated checks and through one controlled real-project Android publication.

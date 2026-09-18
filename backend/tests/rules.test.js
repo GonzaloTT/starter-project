@@ -7,7 +7,8 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
-  Timestamp, deleteDoc, doc, getDoc, setDoc, serverTimestamp, updateDoc,
+  Timestamp, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query,
+  setDoc, serverTimestamp, updateDoc,
 } from 'firebase/firestore';
 import { deleteObject, getBytes, listAll, ref, uploadBytes } from 'firebase/storage';
 
@@ -91,6 +92,20 @@ describe('Firestore rules (unauthenticated client)', () => {
     await assertSucceeds(setDoc(articleReference(), validArticle()));
     const snapshot = await assertSucceeds(getDoc(articleReference()));
     assert.equal(snapshot.data().title, 'A local news article');
+  });
+
+  test('allow listing articles ordered by publication date', async () => {
+    await assertSucceeds(setDoc(doc(database, 'articles/older'), {
+      ...validArticle(), publishedAt: Timestamp.fromMillis(0),
+    }));
+    await assertSucceeds(setDoc(doc(database, 'articles/newer'), {
+      ...validArticle(), publishedAt: Timestamp.fromMillis(1),
+    }));
+    const snapshot = await assertSucceeds(getDocs(query(
+      collection(database, 'articles'),
+      orderBy('publishedAt', 'desc'),
+    )));
+    assert.deepEqual(snapshot.docs.map((article) => article.id), ['newer', 'older']);
   });
 
   for (const field of Object.keys(validArticle())) {

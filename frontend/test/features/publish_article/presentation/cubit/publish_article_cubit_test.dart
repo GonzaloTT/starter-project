@@ -61,6 +61,72 @@ void completeValidForm(PublishArticleCubit cubit) {
 }
 
 void main() {
+  test('pending publication ignores every edit and keeps original parameters',
+      () async {
+    final gate = Completer<PublishArticleResult>();
+    final calls = <PublishArticleParams>[];
+    final cubit = PublishArticleCubit(ControlledPublishArticleUseCase((params) {
+      calls.add(params);
+      return gate.future;
+    }));
+    addTearDown(cubit.close);
+    completeValidForm(cubit);
+    final original = cubit.state;
+    final operation = cubit.publish();
+    final pending = cubit.state;
+    cubit.authorChanged('Other author');
+    cubit.titleChanged('Other title');
+    cubit.descriptionChanged('Other description');
+    cubit.contentChanged('Other content');
+    cubit.thumbnailSelected(validThumbnail());
+    cubit.thumbnailRemoved();
+    await cubit.publish();
+    expect(cubit.state, same(pending));
+    expect(calls, hasLength(1));
+    expect(calls.single.author, original.author);
+    expect(calls.single.title, original.title);
+    expect(calls.single.description, original.description);
+    expect(calls.single.content, original.content);
+    expect(calls.single.thumbnail, same(original.thumbnail));
+    gate.complete(PublishArticleResult.success(publishedArticle()));
+    await operation;
+    expect(cubit.state.isSuccess, isTrue);
+    expect(calls, hasLength(1));
+  });
+
+  test('failure unlocks editing and retry with new parameters', () async {
+    final gate = Completer<PublishArticleResult>();
+    final calls = <PublishArticleParams>[];
+    final cubit = PublishArticleCubit(ControlledPublishArticleUseCase((params) {
+      calls.add(params);
+      return calls.length == 1
+          ? gate.future
+          : Future.value(PublishArticleResult.success(publishedArticle()));
+    }));
+    addTearDown(cubit.close);
+    completeValidForm(cubit);
+    final operation = cubit.publish();
+    gate.completeError(StateError('Controlled failure'));
+    await operation;
+    expect(cubit.state.status, PublishArticleStatus.failure);
+    cubit.authorChanged('New author');
+    cubit.titleChanged('New title');
+    cubit.descriptionChanged('New description');
+    cubit.contentChanged('New content');
+    cubit.thumbnailRemoved();
+    expect(cubit.state.thumbnail, isNull);
+    final replacement = validThumbnail();
+    cubit.thumbnailSelected(replacement);
+    await cubit.publish();
+    expect(calls, hasLength(2));
+    expect(calls.last.author, 'New author');
+    expect(calls.last.title, 'New title');
+    expect(calls.last.description, 'New description');
+    expect(calls.last.content, 'New content');
+    expect(calls.last.thumbnail, same(replacement));
+    expect(cubit.state.isSuccess, isTrue);
+  });
+
   group('PublishArticleCubit', () {
     test('starts with an empty initial state', () async {
       final cubit = PublishArticleCubit(

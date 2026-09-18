@@ -67,128 +67,164 @@ class _PublishArticlePageState extends State<PublishArticlePage> {
     return BlocListener<PublishArticleCubit, PublishArticleState>(
       listenWhen: (previous, current) => previous.status != current.status,
       listener: _onStateChanged,
-      child: Scaffold(
-        resizeToAvoidBottomInset: true,
-        appBar: AppBar(
-          leading: IconButton(
-            key: const Key('publishArticleBackButton'),
-            onPressed: () => Navigator.maybePop(context),
-            icon: const Icon(
-              Icons.chevron_left,
-              color: Colors.black,
+      child: BlocBuilder<PublishArticleCubit, PublishArticleState>(
+        builder: (context, state) => PopScope(
+          canPop: !state.isSubmitting,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop &&
+                context.read<PublishArticleCubit>().state.isSubmitting) {
+              _showPublishingMessage(context);
+            }
+          },
+          child: Scaffold(
+            resizeToAvoidBottomInset: true,
+            appBar: AppBar(
+              leading: IconButton(
+                key: const Key('publishArticleBackButton'),
+                onPressed: () {
+                  if (context.read<PublishArticleCubit>().state.isSubmitting) {
+                    _showPublishingMessage(context);
+                  } else {
+                    Navigator.maybePop(context);
+                  }
+                },
+                icon: const Icon(
+                  Icons.chevron_left,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+            body: BlocBuilder<PublishArticleCubit, PublishArticleState>(
+              builder: (context, state) {
+                return SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _ArticleTextField(
+                        enabled: !state.isSubmitting,
+                        key: _errorTargets[PublishArticleField.title],
+                        fieldKey: const Key('publishArticleTitleField'),
+                        hintText: 'Write your title here...',
+                        errorText: state.errorFor(PublishArticleField.title),
+                        minLines: 2,
+                        maxLines: 3,
+                        onChanged:
+                            context.read<PublishArticleCubit>().titleChanged,
+                      ),
+                      const SizedBox(height: 16),
+                      _ArticleTextField(
+                        enabled: !state.isSubmitting,
+                        fieldKey: const Key('publishArticleAuthorField'),
+                        key: _errorTargets[PublishArticleField.author],
+                        hintText: 'Write the author here...',
+                        errorText: state.errorFor(PublishArticleField.author),
+                        textCapitalization: TextCapitalization.words,
+                        onChanged:
+                            context.read<PublishArticleCubit>().authorChanged,
+                      ),
+                      const SizedBox(height: 16),
+                      _ArticleTextField(
+                        enabled: !state.isSubmitting,
+                        fieldKey: const Key('publishArticleDescriptionField'),
+                        key: _errorTargets[PublishArticleField.description],
+                        hintText: 'Write a short description...',
+                        errorText: state.errorFor(
+                          PublishArticleField.description,
+                        ),
+                        minLines: 2,
+                        maxLines: 4,
+                        onChanged: context
+                            .read<PublishArticleCubit>()
+                            .descriptionChanged,
+                      ),
+                      const SizedBox(height: 24),
+                      _ThumbnailSection(
+                          key:
+                              _errorTargets[PublishArticleField.thumbnailBytes],
+                          state: state,
+                          imagePicker: widget.imagePicker),
+                      const SizedBox(height: 24),
+                      _ArticleTextField(
+                        enabled: !state.isSubmitting,
+                        fieldKey: const Key('publishArticleContentField'),
+                        key: _errorTargets[PublishArticleField.content],
+                        hintText: 'Add article here...',
+                        errorText: state.errorFor(PublishArticleField.content),
+                        minLines: 10,
+                        maxLines: 18,
+                        keyboardType: TextInputType.multiline,
+                        onChanged:
+                            context.read<PublishArticleCubit>().contentChanged,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            bottomNavigationBar:
+                BlocBuilder<PublishArticleCubit, PublishArticleState>(
+              buildWhen: (previous, current) =>
+                  previous.status != current.status,
+              builder: (context, state) {
+                return SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 10, 24, 16),
+                    child: SizedBox(
+                      height: 58,
+                      child: ElevatedButton.icon(
+                        key: const Key('publishArticleSubmitButton'),
+                        onPressed: state.isSubmitting
+                            ? null
+                            : context.read<PublishArticleCubit>().publish,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primaryContainer,
+                          foregroundColor: Colors.black87,
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: state.isSubmitting
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.login),
+                        label: Text(
+                          state.isSubmitting
+                              ? 'Publishing...'
+                              : 'Publish Article',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),
-        body: BlocBuilder<PublishArticleCubit, PublishArticleState>(
-          builder: (context, state) {
-            return SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _ArticleTextField(
-                    key: _errorTargets[PublishArticleField.title],
-                    fieldKey: const Key('publishArticleTitleField'),
-                    hintText: 'Write your title here...',
-                    errorText: state.errorFor(PublishArticleField.title),
-                    minLines: 2,
-                    maxLines: 3,
-                    onChanged: context.read<PublishArticleCubit>().titleChanged,
-                  ),
-                  const SizedBox(height: 16),
-                  _ArticleTextField(
-                    fieldKey: const Key('publishArticleAuthorField'),
-                    key: _errorTargets[PublishArticleField.author],
-                    hintText: 'Write the author here...',
-                    errorText: state.errorFor(PublishArticleField.author),
-                    textCapitalization: TextCapitalization.words,
-                    onChanged:
-                        context.read<PublishArticleCubit>().authorChanged,
-                  ),
-                  const SizedBox(height: 16),
-                  _ArticleTextField(
-                    fieldKey: const Key('publishArticleDescriptionField'),
-                    key: _errorTargets[PublishArticleField.description],
-                    hintText: 'Write a short description...',
-                    errorText: state.errorFor(
-                      PublishArticleField.description,
-                    ),
-                    minLines: 2,
-                    maxLines: 4,
-                    onChanged:
-                        context.read<PublishArticleCubit>().descriptionChanged,
-                  ),
-                  const SizedBox(height: 24),
-                  _ThumbnailSection(
-                      key: _errorTargets[PublishArticleField.thumbnailBytes],
-                      state: state,
-                      imagePicker: widget.imagePicker),
-                  const SizedBox(height: 24),
-                  _ArticleTextField(
-                    fieldKey: const Key('publishArticleContentField'),
-                    key: _errorTargets[PublishArticleField.content],
-                    hintText: 'Add article here...',
-                    errorText: state.errorFor(PublishArticleField.content),
-                    minLines: 10,
-                    maxLines: 18,
-                    keyboardType: TextInputType.multiline,
-                    onChanged:
-                        context.read<PublishArticleCubit>().contentChanged,
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-        bottomNavigationBar:
-            BlocBuilder<PublishArticleCubit, PublishArticleState>(
-          buildWhen: (previous, current) => previous.status != current.status,
-          builder: (context, state) {
-            return SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 10, 24, 16),
-                child: SizedBox(
-                  height: 58,
-                  child: ElevatedButton.icon(
-                    key: const Key('publishArticleSubmitButton'),
-                    onPressed: state.isSubmitting
-                        ? null
-                        : context.read<PublishArticleCubit>().publish,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          Theme.of(context).colorScheme.primaryContainer,
-                      foregroundColor: Colors.black87,
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: state.isSubmitting
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(Icons.login),
-                    label: Text(
-                      state.isSubmitting ? 'Publishing...' : 'Publish Article',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
       ),
     );
+  }
+
+  void _showPublishingMessage(BuildContext context) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(
+        content: Text('Publication is in progress. Please wait.'),
+      ));
   }
 }
 
@@ -300,6 +336,7 @@ class _ThumbnailSectionState extends State<_ThumbnailSection> {
 }
 
 class _ArticleTextField extends StatelessWidget {
+  final bool enabled;
   final Key fieldKey;
   final String hintText;
   final String? errorText;
@@ -311,6 +348,7 @@ class _ArticleTextField extends StatelessWidget {
 
   const _ArticleTextField({
     Key? key,
+    required this.enabled,
     required this.fieldKey,
     required this.hintText,
     required this.errorText,
@@ -325,6 +363,7 @@ class _ArticleTextField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextField(
       key: fieldKey,
+      enabled: enabled,
       minLines: minLines,
       maxLines: maxLines,
       keyboardType: keyboardType,

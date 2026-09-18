@@ -305,23 +305,77 @@ void main() {
     });
   }
 
-  testWidgets('late success after manual back does not pop Home or confirm',
-      (tester) async {
+  for (final systemBack in [false, true]) {
+    testWidgets(
+        'blocks back during submission, then confirms once: system=$systemBack',
+        (tester) async {
+      final gate = Completer<void>();
+      final publisher = ControlledPublisher((_) => gate.future);
+      final cubit = PublishArticleCubit(publisher);
+      await openForm(tester, cubit);
+      await fillForm(tester);
+      await tester.tap(submit);
+      await tester.pump();
+      for (final field
+          in tester.widgetList<TextField>(find.byType(TextField))) {
+        expect(field.enabled, isFalse);
+      }
+      expect(
+          tester
+              .widget<ElevatedButton>(
+                  find.byKey(const Key('publishArticleAttachImageButton')))
+              .onPressed,
+          isNull);
+      expect(
+          tester
+              .widget<TextButton>(
+                  find.byKey(const Key('publishArticleRemoveImageButton')))
+              .onPressed,
+          isNull);
+      if (systemBack) {
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(find.byKey(const Key('publishArticleBackButton')));
+      }
+      await pumpTransitions(tester);
+      expect(observer.pops, 0);
+      expect(find.byType(PublishArticlePage), findsOneWidget);
+      expect(find.text('Publication is in progress. Please wait.'),
+          findsOneWidget);
+      expect(cubit.state.isSubmitting, isTrue);
+      expect(publisher.calls, 1);
+      gate.complete();
+      await pumpTransitions(tester);
+      expect(observer.pops, 1);
+      expect(find.byType(PublishArticlePage), findsNothing);
+      expect(find.text(successMessage), findsOneWidget);
+      expect(publisher.calls, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('failure unlocks fields and system back', (tester) async {
     final gate = Completer<void>();
     final cubit = PublishArticleCubit(ControlledPublisher((_) => gate.future));
     await openForm(tester, cubit);
     await fillForm(tester);
     await tester.tap(submit);
     await tester.pump();
-    await tester.tap(find.byKey(const Key('publishArticleBackButton')));
-    gate.complete();
+    gate.completeError(StateError('Controlled failure'));
+    await pumpTransitions(tester);
+    for (final field in tester.widgetList<TextField>(find.byType(TextField))) {
+      expect(field.enabled, isTrue);
+    }
+    final title = find.byKey(const Key('publishArticleTitleField'));
+    await tester.ensureVisible(title);
+    await tester.enterText(title, 'Edited after failure');
+    expect(cubit.state.title, 'Edited after failure');
+    await tester.binding.handlePopRoute();
     await pumpTransitions(tester);
     expect(observer.pops, 1);
-    expect(find.byType(DailyNews), findsOneWidget);
+    expect(find.byType(PublishArticlePage), findsNothing);
     expect(find.text(successMessage), findsNothing);
-    expect(tester.takeException(), isNull);
   });
-
   testWidgets('Home ignores success when its context was unmounted',
       (tester) async {
     final showHome = ValueNotifier(true);

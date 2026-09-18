@@ -13,6 +13,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
       : super(PublishArticleState());
 
   void authorChanged(String value) {
+    if (state.isSubmitting) return;
     emit(
       state.copyWith(
         author: value,
@@ -27,6 +28,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
   }
 
   void titleChanged(String value) {
+    if (state.isSubmitting) return;
     emit(
       state.copyWith(
         title: value,
@@ -41,6 +43,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
   }
 
   void descriptionChanged(String value) {
+    if (state.isSubmitting) return;
     emit(
       state.copyWith(
         description: value,
@@ -55,6 +58,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
   }
 
   void contentChanged(String value) {
+    if (state.isSubmitting) return;
     emit(
       state.copyWith(
         content: value,
@@ -69,6 +73,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
   }
 
   void thumbnailSelected(ArticleThumbnail thumbnail) {
+    if (state.isSubmitting) return;
     emit(
       state.copyWith(
         thumbnail: thumbnail,
@@ -85,6 +90,7 @@ class PublishArticleCubit extends Cubit<PublishArticleState> {
   }
 
   void thumbnailRemoved() {
+    if (state.isSubmitting) return;
     emit(
       state.copyWith(
         clearThumbnail: true,

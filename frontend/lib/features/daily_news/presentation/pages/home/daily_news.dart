@@ -84,7 +84,14 @@ class DailyNews extends StatelessWidget {
     Navigator.pushNamed(context, '/SavedArticles');
   }
 
-  void _onPublishArticleViewTapped(BuildContext context) {
-    Navigator.pushNamed(context, '/PublishArticle');
+  Future<void> _onPublishArticleViewTapped(BuildContext context) async {
+    final published = await Navigator.pushNamed(context, '/PublishArticle');
+    if (!context.mounted || published != true) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Article published successfully.')),
+      );
   }
 }
